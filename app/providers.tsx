@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useEffect, ReactNode } from 'react';
-import { SessionProvider } from 'next-auth/react';
-import { ThemeProvider } from 'next-themes';
 
 export default function Providers({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -11,6 +9,9 @@ export default function Providers({ children }: { children: ReactNode }) {
   if (!mounted) {
     return <>{children}</>;
   }
+
+  const SessionProvider = require('next-auth/react').SessionProvider;
+  const { ThemeProvider } = require('next-themes');
 
   return (
     <SessionProvider>

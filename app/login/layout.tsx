@@ -1,0 +1,9 @@
+import ProvidersWrapper from '@/components/ProvidersWrapper';
+
+export default function LoginLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return <ProvidersWrapper>{children}</ProvidersWrapper>;
+}
