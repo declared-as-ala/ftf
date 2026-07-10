@@ -1,1 +1,2 @@
-export { GET, POST, runtime } from '../seasons/route';
+export const runtime = 'nodejs';
+export { GET, POST } from '../seasons/route';

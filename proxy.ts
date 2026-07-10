@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export default async function middleware(req: NextRequest) {
+export default async function proxy(req: NextRequest) {
   let session;
   try {
     session = await auth();
