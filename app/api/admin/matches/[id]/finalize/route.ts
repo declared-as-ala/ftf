@@ -6,7 +6,7 @@ export const runtime = 'nodejs';
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireAdmin();
@@ -16,7 +16,7 @@ export async function POST(
     }
 
     const result = await MatchFinalizationService.finalizeMatch(
-      params.id,
+      (await params).id,
       session.user.id,
       orgId
     );
@@ -27,6 +27,6 @@ export async function POST(
 
     return NextResponse.json({ success: true, status: result.status });
   } catch (error) {
-    return apiError(error, `POST /api/admin/matches/${params.id}/finalize`);
+    return apiError(error, `POST /api/admin/matches/${(await params).id}/finalize`);
   }
 }

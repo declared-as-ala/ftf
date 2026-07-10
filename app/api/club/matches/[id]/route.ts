@@ -12,13 +12,13 @@ export const runtime = 'nodejs';
 
 export async function GET(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { clubId } = await requireClub();
     await connectDB();
 
-    const { id } = params;
+    const { id } = await params;
 
     const match = await Match.findById(id)
       .populate('homeClubId', 'nom logo')

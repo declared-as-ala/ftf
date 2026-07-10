@@ -8,7 +8,7 @@ export const runtime = 'nodejs';
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string; action: string } }
+  { params }: { params: Promise<{ id: string; action: string }> }
 ) {
   try {
     const session = await requireAdmin();
@@ -17,7 +17,7 @@ export async function POST(
       return NextResponse.json({ error: 'Organisation non configurée' }, { status: 400 });
     }
 
-    const { id, action } = params;
+    const { id, action } = await params;
     if (!['activate', 'complete', 'archive'].includes(action)) {
       return NextResponse.json({ error: 'Action invalide' }, { status: 400 });
     }
@@ -65,6 +65,6 @@ export async function POST(
 
     return NextResponse.json(season);
   } catch (error) {
-    return apiError(error, `POST /api/admin/seasons/${params.id}/${params.action}`);
+    return apiError(error, `POST /api/admin/seasons/${(await params).id}/${(await params).action}`);
   }
 }

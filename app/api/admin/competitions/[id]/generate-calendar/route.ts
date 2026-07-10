@@ -6,7 +6,7 @@ export const runtime = 'nodejs';
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireAdmin();
@@ -15,7 +15,7 @@ export async function POST(
       return NextResponse.json({ error: 'Organisation non configurée' }, { status: 400 });
     }
 
-    const { id: competitionId } = params;
+    const { id: competitionId } = await params;
     const body = await req.json().catch(() => ({}));
     const { doubleLeg = true, startDate } = body;
 
@@ -35,6 +35,6 @@ export async function POST(
       matchesCount: result.matchesCount,
     });
   } catch (error) {
-    return apiError(error, `POST /api/admin/competitions/${params.id}/generate-calendar`);
+    return apiError(error, `POST /api/admin/competitions/${(await params).id}/generate-calendar`);
   }
 }

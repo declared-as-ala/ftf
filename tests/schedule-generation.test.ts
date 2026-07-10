@@ -346,7 +346,7 @@ describe('Rounds & Generate Calendar API Endpoints', () => {
       body: JSON.stringify(body),
     });
 
-    const res = await generateCalendarRoute.POST(req, { params: { id: competition._id.toString() } });
+    const res = await generateCalendarRoute.POST(req, { params: Promise.resolve({ id: competition._id.toString() }) });
     expect(res.status).toBe(200);
 
     const data = await res.json();

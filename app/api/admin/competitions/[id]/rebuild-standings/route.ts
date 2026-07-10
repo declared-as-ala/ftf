@@ -6,13 +6,13 @@ export const runtime = 'nodejs';
 
 export async function POST(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireAdmin();
 
     const standings = await StandingsService.rebuildCompetitionStandings(
-      params.id,
+      (await params).id,
       session.user.id
     );
 
@@ -22,6 +22,6 @@ export async function POST(
       calculatedAt: standings.calculatedAt,
     });
   } catch (error) {
-    return apiError(error, `POST /api/admin/competitions/${params.id}/rebuild-standings`);
+    return apiError(error, `POST /api/admin/competitions/${(await params).id}/rebuild-standings`);
   }
 }

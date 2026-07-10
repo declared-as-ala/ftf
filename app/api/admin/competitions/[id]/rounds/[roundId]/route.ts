@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
 
 export async function GET(
   _req: Request,
-  { params }: { params: { id: string; roundId: string } }
+  { params }: { params: Promise<{ id: string; roundId: string }> }
 ) {
   try {
     const session = await requireAdmin();
@@ -19,8 +19,8 @@ export async function GET(
     await connectDB();
 
     const round = await Round.findOne({
-      _id: params.roundId,
-      competitionId: params.id,
+      _id: (await params).roundId,
+      competitionId: (await params).id,
       organizationId: orgId,
     }).lean();
 
@@ -28,7 +28,7 @@ export async function GET(
       return NextResponse.json({ error: 'Journée introuvable' }, { status: 404 });
     }
 
-    const matches = await Match.find({ roundId: params.roundId, competitionId: params.id })
+    const matches = await Match.find({ roundId: (await params).roundId, competitionId: (await params).id })
       .populate('homeClubId', 'nom logo code')
       .populate('awayClubId', 'nom logo code')
       .populate('evenements.joueurId', 'nom prenom')
@@ -37,6 +37,6 @@ export async function GET(
 
     return NextResponse.json({ round, matches });
   } catch (error) {
-    return apiError(error, `GET /api/admin/competitions/${params.id}/rounds/${params.roundId}`);
+    return apiError(error, `GET /api/admin/competitions/${(await params).id}/rounds/${(await params).roundId}`);
   }
 }

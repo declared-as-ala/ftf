@@ -167,7 +167,7 @@ describe('Seasons API Route Handlers', () => {
       body: JSON.stringify({ nom: 'Saison Modifiée' }),
     });
 
-    const res = await seasonDetailRoute.PUT(req, { params: { id: season._id.toString() } });
+    const res = await seasonDetailRoute.PUT(req, { params: Promise.resolve({ id: season._id.toString() }) });
     expect(res.status).toBe(200);
 
     const updated = await Saison.findById(season._id);
@@ -202,12 +202,12 @@ describe('Seasons API Route Handlers', () => {
       method: 'DELETE',
     });
 
-    const res1 = await seasonDetailRoute.DELETE(req, { params: { id: season._id.toString() } });
+    const res1 = await seasonDetailRoute.DELETE(req, { params: Promise.resolve({ id: season._id.toString() }) });
     expect(res1.status).toBe(400);
 
     // Supprimer la compétition et re-tester
     await Competition.deleteMany({});
-    const res2 = await seasonDetailRoute.DELETE(req, { params: { id: season._id.toString() } });
+    const res2 = await seasonDetailRoute.DELETE(req, { params: Promise.resolve({ id: season._id.toString() }) });
     expect(res2.status).toBe(200);
 
     const exists = await Saison.findById(season._id);
@@ -248,7 +248,7 @@ describe('Seasons Custom Actions Handlers', () => {
       method: 'POST',
     });
 
-    const res = await seasonActionRoute.POST(req, { params: { id: s2._id.toString(), action: 'activate' } });
+    const res = await seasonActionRoute.POST(req, { params: Promise.resolve({ id: s2._id.toString(), action: 'activate' }) });
     expect(res.status).toBe(200);
 
     const fresh1 = await Saison.findById(s1._id);
@@ -366,7 +366,7 @@ describe('Competitions API Route Handlers', () => {
       }),
     });
 
-    const res = await compClubsRoute.POST(req, { params: { id: comp._id.toString() } });
+    const res = await compClubsRoute.POST(req, { params: Promise.resolve({ id: comp._id.toString() }) });
     expect(res.status).toBe(200);
 
     const updated = await Competition.findById(comp._id);

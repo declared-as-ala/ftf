@@ -12,7 +12,7 @@ const rescheduleSchema = z.object({
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireAdmin();
@@ -25,7 +25,7 @@ export async function POST(
     const { newDate, reason } = rescheduleSchema.parse(body);
 
     const match = await MatchFinalizationService.rescheduleMatch(
-      params.id,
+      (await params).id,
       new Date(newDate),
       reason,
       session.user.id,
@@ -34,6 +34,6 @@ export async function POST(
 
     return NextResponse.json(match);
   } catch (error) {
-    return apiError(error, `POST /api/admin/matches/${params.id}/reschedule`);
+    return apiError(error, `POST /api/admin/matches/${(await params).id}/reschedule`);
   }
 }

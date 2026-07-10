@@ -11,7 +11,7 @@ const reopenSchema = z.object({
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireAdmin();
@@ -24,7 +24,7 @@ export async function POST(
     const { reason } = reopenSchema.parse(body);
 
     const match = await MatchCorrectionService.reopenMatch(
-      params.id,
+      (await params).id,
       reason,
       session.user.id,
       orgId
@@ -32,6 +32,6 @@ export async function POST(
 
     return NextResponse.json(match);
   } catch (error) {
-    return apiError(error, `POST /api/admin/matches/${params.id}/reopen`);
+    return apiError(error, `POST /api/admin/matches/${(await params).id}/reopen`);
   }
 }

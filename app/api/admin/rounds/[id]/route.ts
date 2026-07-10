@@ -18,7 +18,7 @@ const roundUpdateSchema = z.object({
 
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireAdmin();
@@ -27,7 +27,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Organisation non configurée' }, { status: 400 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     await connectDB();
 
     const round = await Round.findOne({ _id: id, organizationId: orgId });
@@ -60,13 +60,13 @@ export async function PUT(
 
     return NextResponse.json(round);
   } catch (error) {
-    return apiError(error, `PUT /api/admin/rounds/${params.id}`);
+    return apiError(error, `PUT /api/admin/rounds/${(await params).id}`);
   }
 }
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireAdmin();
@@ -75,7 +75,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Organisation non configurée' }, { status: 400 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     await connectDB();
 
     const round = await Round.findOne({ _id: id, organizationId: orgId });
@@ -106,6 +106,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    return apiError(error, `DELETE /api/admin/rounds/${params.id}`);
+    return apiError(error, `DELETE /api/admin/rounds/${(await params).id}`);
   }
 }

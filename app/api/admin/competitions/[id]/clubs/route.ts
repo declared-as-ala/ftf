@@ -11,7 +11,7 @@ export const runtime = 'nodejs';
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireAdmin();
@@ -20,7 +20,7 @@ export async function POST(
       return NextResponse.json({ error: 'Organisation non configurée' }, { status: 400 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     await connectDB();
 
     const comp = await Competition.findOne({ _id: id, organizationId: orgId });
@@ -57,6 +57,6 @@ export async function POST(
 
     return NextResponse.json(comp);
   } catch (error) {
-    return apiError(error, `POST /api/admin/competitions/${params.id}/clubs`);
+    return apiError(error, `POST /api/admin/competitions/${(await params).id}/clubs`);
   }
 }

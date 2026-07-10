@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 export async function GET(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireAdmin();
@@ -15,7 +15,7 @@ export async function GET(
 
     await connectDB();
 
-    const standings = await Standings.findOne({ competitionId: params.id })
+    const standings = await Standings.findOne({ competitionId: (await params).id })
       .populate('rows.clubId', 'nom logo code')
       .lean();
 
@@ -25,6 +25,6 @@ export async function GET(
 
     return NextResponse.json(standings);
   } catch (error) {
-    return apiError(error, `GET /api/admin/competitions/${params.id}/standings`);
+    return apiError(error, `GET /api/admin/competitions/${(await params).id}/standings`);
   }
 }

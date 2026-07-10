@@ -8,13 +8,13 @@ export const runtime = 'nodejs';
 
 export async function GET(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await requireAdmin();
     await connectDB();
 
-    const { id } = params;
+    const { id } = await params;
     const user = await User.findById(id)
       .populate('clubId', 'nom')
       .select('email name role status clubId createdAt lastLoginAt mustChangePassword')
@@ -29,13 +29,13 @@ export async function GET(
 
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await requireAdmin();
     await connectDB();
 
-    const { id } = params;
+    const { id } = await params;
     const body = await req.json();
 
     const user = await User.findById(id);
@@ -67,13 +67,13 @@ export async function PUT(
 
 export async function DELETE(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await requireAdmin();
     await connectDB();
 
-    const { id } = params;
+    const { id } = await params;
     const user = await User.findById(id);
     if (!user) throw new ApiError(404, 'Utilisateur introuvable');
 

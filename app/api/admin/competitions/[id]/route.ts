@@ -12,7 +12,7 @@ export const runtime = 'nodejs';
 
 export async function GET(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireAdmin();
@@ -22,7 +22,7 @@ export async function GET(
     }
 
     await connectDB();
-    const comp = await Competition.findOne({ _id: params.id, organizationId: orgId })
+    const comp = await Competition.findOne({ _id: (await params).id, organizationId: orgId })
       .populate('saisonId')
       .populate('clubsParticipants')
       .populate('disciplinaryRuleSetId');
@@ -33,13 +33,13 @@ export async function GET(
 
     return NextResponse.json(comp);
   } catch (error) {
-    return apiError(error, `GET /api/admin/competitions/${params.id}`);
+    return apiError(error, `GET /api/admin/competitions/${(await params).id}`);
   }
 }
 
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireAdmin();
@@ -48,7 +48,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Organisation non configurée' }, { status: 400 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     await connectDB();
 
     const comp = await Competition.findOne({ _id: id, organizationId: orgId });
@@ -96,13 +96,13 @@ export async function PUT(
 
     return NextResponse.json(comp);
   } catch (error) {
-    return apiError(error, `PUT /api/admin/competitions/${params.id}`);
+    return apiError(error, `PUT /api/admin/competitions/${(await params).id}`);
   }
 }
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireAdmin();
@@ -111,7 +111,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Organisation non configurée' }, { status: 400 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     await connectDB();
 
     const comp = await Competition.findOne({ _id: id, organizationId: orgId });
@@ -148,6 +148,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    return apiError(error, `DELETE /api/admin/competitions/${params.id}`);
+    return apiError(error, `DELETE /api/admin/competitions/${(await params).id}`);
   }
 }
