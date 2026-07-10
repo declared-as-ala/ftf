@@ -18,7 +18,22 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" suppressHydrationWarning>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var t = localStorage.getItem("theme");
+                var s = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+                var r = t || s || "light";
+                document.documentElement.className = r;
+                document.documentElement.style.colorScheme = r;
+              } catch(e) {}
+            `,
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }
