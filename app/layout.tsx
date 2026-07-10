@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import SessionProvider from "@/components/providers/SessionProvider";
-import ThemeProvider from "@/components/providers/ThemeProvider";
+import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "FTF - Fédération Tunisienne de Football",
@@ -19,16 +18,7 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <body className="antialiased">
-        <SessionProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            {children}
-          </ThemeProvider>
-        </SessionProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
