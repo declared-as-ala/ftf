@@ -1,0 +1,29 @@
+import { auth } from '@/lib/auth';
+import { redirect } from 'next/navigation';
+import Navbar from '@/components/Navbar';
+import Sidebar from '@/components/Sidebar';
+
+export default async function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const session = await auth();
+
+  if (!session || session.user.role !== 'FTF_ADMIN') {
+    redirect('/login');
+  }
+
+  return (
+    <div className="min-h-screen">
+      <Navbar />
+      <div className="flex">
+        <Sidebar role="FTF_ADMIN" />
+        <main className="flex-1 ml-16 md:ml-64 p-8 pt-6 transition-all duration-200">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
+

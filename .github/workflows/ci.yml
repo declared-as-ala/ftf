@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: TypeScript
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+        env:
+          MONGODB_URI: mongodb://localhost:27017/ftf-test
+          NEXTAUTH_SECRET: test-secret-not-for-production
+          NEXTAUTH_URL: http://localhost:3000
+
+      - name: Build
+        run: npm run build
+        env:
+          MONGODB_URI: mongodb://localhost:27017/ftf-test
+          NEXTAUTH_SECRET: test-secret-not-for-production
+          NEXTAUTH_URL: http://localhost:3000
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [check]
+    if: github.event_name == 'pull_request'
+
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        run: npm run build
+        env:
+          MONGODB_URI: mongodb://localhost:27017/ftf-e2e
+          NEXTAUTH_SECRET: test-secret-not-for-production
+          NEXTAUTH_URL: http://localhost:3000
+
+      - name: Bootstrap + seed
+        run: npx tsx scripts/bootstrap.ts && npx tsx scripts/seed.ts --force
+        env:
+          MONGODB_URI: mongodb://localhost:27017/ftf-e2e
+          NEXTAUTH_SECRET: test-secret-not-for-production
+          NEXTAUTH_URL: http://localhost:3000
+
+      - name: Start server
+        run: |
+          node .next/standalone/server.js &
+          sleep 5
+        env:
+          MONGODB_URI: mongodb://localhost:27017/ftf-e2e
+          NEXTAUTH_SECRET: test-secret-not-for-production
+          NEXTAUTH_URL: http://localhost:3000
+
+      - name: Run E2E
+        run: npx playwright test
+        env:
+          BASE_URL: http://localhost:3000
