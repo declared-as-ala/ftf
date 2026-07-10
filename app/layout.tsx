@@ -1,13 +1,6 @@
-import type { Metadata } from "next";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "FTF - Fédération Tunisienne de Football",
-  description: "Système de gestion de la Fédération Tunisienne de Football",
-  icons: {
-    icon: "/icon.png",
-  },
-};
+export const dynamic = 'force-dynamic';
 
 export default function RootLayout({
   children,
