@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin, apiError } from '@/lib/api';
+import { requireAdmin, apiError, escapeRegex } from '@/lib/api';
 import connectDB from '@/lib/db';
 import Joueur from '@/lib/models/Joueur';
 import Club from '@/lib/models/Club';
@@ -20,7 +20,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ results: [] });
     }
 
-    const regex = { $regex: q, $options: 'i' };
+    const regex = { $regex: escapeRegex(q), $options: 'i' };
 
     const [joueurs, clubs, matches, competitions] = await Promise.all([
       Joueur.find({

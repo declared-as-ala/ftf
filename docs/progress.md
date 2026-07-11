@@ -30,6 +30,7 @@
 | Phase 6 — Club Portal | ✅ | see Batch 10 log | 2026-07-10 | **Phase 6 terminée** — 69 tests verts; 11 API routes, 10 pages, sidebar mis à jour |
 | Phase 7 — Reports, Audit UI, Search, Imports | 🟨 | see Batch 11 log | 2026-07-10 | **Phase 7 partielle** — 69 tests verts; ReportService + reports page, audit page, users CRUD, settings, search API |
 | Phase 8 — Production Ready | ⬜ | | | |
+| Phase 8 — Realistic large development seed | ✅ | `scripts/seed.ts` | 2026-07-11 | 16 LP1 clubs, 384 players, 30 rounds, 240 matches, discipline/standings/notifications/audit |
 
 ## Batch log
 
@@ -187,6 +188,21 @@
 - **Tests run:** `npx tsc --noEmit` → zéro nouvelle erreur (seuls les erreurs pré-existantes `.next/dev/types/validator.ts` persistantes) · `npm run test` → **69/69 tests verts**
 - **Remaining issues:** CSV imports (clubs, players, fixtures, results) not yet implemented
 - **Next batch proposed:** **Phase 7 Part 2 — CSV Imports:** upload→validate→preview→confirm→process pipeline
+
+### Batch 12 — Large realistic development dataset (2026-07-11) ✅
+- **Modified:** `scripts/seed.ts` — deterministic LP1 2025-2026 scale seed based on the public 16-club/30-round/240-match competition structure; full-collection document reset compatible with restricted Atlas users; real club identities and stadium metadata; 24 safe test-player fixtures per club; complete calendar; mixed official/draft/postponed/scheduled states; embedded match events; canonical cards; automatic/provisional suspensions; serving ledger; standings; notifications; audit history; derived player/season statistics.
+- **Database reset executed:** Atlas database `ftfa` cleared and reseeded successfully.
+- **Result:** 16 clubs · 384 players · 48 staff · 10 referees · 30 rounds · 240 matches (176 official) · 622 cards · 155 suspensions.
+- **Tests run:** `npx tsc --noEmit` clean · `npm run test` → **69/69 tests green** · destructive guard retained (`--force`, production refusal).
+- **Data note:** club/competition structure and stadium identities are public real-world data; player identities are deterministic QA fixtures and are not represented as the federation's official registration roster.
+
+### Batch 13 — Review, sidebar fixes, login redesign, seed assets (2026-07-11) ✅
+- **Review fixes:** `lib/api.ts` (+`escapeRegex`) appliqué à `app/api/club/players` et `app/api/admin/search` (**injection regex corrigée** — `search=(((` cassait la requête, désormais 200) · `next.config.ts` (**`output: 'standalone'` restauré** — le Dockerfile copie `.next/standalone`, le build Docker était cassé sans lui ; + `dangerouslyAllowSVG` avec CSP sandbox pour les assets SVG locaux)
+- **Sidebar admin réparée:** créé `app/api/admin/staff/route.ts` + `app/admin/staff/page.tsx` (annuaire du staff groupé par club, recherche debounce, filtre fonction) · liens `transferts`/`licences`/`evenements` retirés (modules gelés hors périmètre v1 — commentés dans `components/Sidebar.tsx`, réactivables)
+- **Login redécoré** (`app/login/page.tsx`): split-screen institutionnel — panneau navy avec tracé de terrain SVG + liseré rouge tunisien, police Archivo scoped, animations d'entrée échelonnées, icônes champs, accessibilité conservée (labels, role=alert, autocomplete)
+- **Assets seedés** (`scripts/asset-helpers.ts` + `scripts/seed.ts`): 16 blasons SVG bicolores (`/uploads/clubs/<CODE>.svg`) + 384 avatars joueurs aux couleurs du club (`/uploads/joueurs/<licence>.svg`) — génération déterministe hors-ligne ; seed ré-exécuté (176 matchs homologués, 622 cartons, 155 suspensions)
+- **Tests run:** `npx tsc --noEmit` clean · **69/69 tests verts** · smoke HTTP réel : login page 200 avec nouveau design ✅ · `/uploads/clubs/EST.svg` 200 `image/svg+xml` ✅ · avatar joueur 200 ✅ · login admin → staff API 200 + staff page 200 ✅ · recherche regex `(((` sans erreur ✅
+- **Remaining issues:** liens gelés réactivables si le périmètre change (décision produit) ; rotation Atlas toujours en attente (user)
 
 ## Open blockers & user actions
 

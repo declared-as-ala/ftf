@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140">
+  <defs>
+    <clipPath id="shield"><path d="M60 6 L112 24 V72 C112 106 91 126 60 134 C29 126 8 106 8 72 V24 Z"/></clipPath>
+  </defs>
+  <path d="M60 6 L112 24 V72 C112 106 91 126 60 134 C29 126 8 106 8 72 V24 Z" fill="#f2b705"/>
+  <g clip-path="url(#shield)">
+    <rect x="60" y="0" width="60" height="140" fill="#181a1f"/>
+    <rect x="0" y="76" width="120" height="30" fill="#101828"/>
+    <circle cx="60" cy="44" r="17" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="3"/>
+    <path d="M60 27 v34 M43 44 h34" stroke="rgba(255,255,255,0.85)" stroke-width="3"/>
+  </g>
+  <text x="60" y="98" text-anchor="middle" dominant-baseline="middle"
+        font-family="Arial, Helvetica, sans-serif" font-weight="bold"
+        font-size="21" fill="#ffffff" letter-spacing="1">USBG</text>
+  <path d="M60 6 L112 24 V72 C112 106 91 126 60 134 C29 126 8 106 8 72 V24 Z" fill="none" stroke="rgba(16,24,40,0.9)" stroke-width="3"/>
+  <path d="M60 12 L106 28 V71 C106 101 88 119 60 127 C32 119 14 101 14 71 V28 Z"
+        fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
+</svg>

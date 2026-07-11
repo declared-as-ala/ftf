@@ -149,7 +149,7 @@
 - [ ] Security headers + prod cookie/session config; restrict `images.remotePatterns`
 - [ ] `/api/health` healthcheck; compose restart policies; Mongo not publicly exposed; uploads volume strategy (standalone-output compatible)
 - [ ] CI (GitHub Actions): tsc + lint + tests + build
-- [ ] Production admin bootstrap script (no demo users); seed v2 (8+ clubs, 18+ players/club, engine-exercising data)
+- [x] Production admin bootstrap script (no demo users); seed v2 (16 clubs, 24 players/club, 30 rounds, engine-exercising data) — 2026-07-11
 - [ ] E2E (Playwright): yellow-card journey + red-card journey (per [testing.md](testing.md) §5)
 - [ ] Docs: `deployment.md`, `backup-and-restore.md`, `user-guide-admin.md`, `user-guide-club.md`; resolve empty INSTALLATION/QUICKSTART/START_HERE placeholders (ask owner)
 - [ ] Logging & error-monitoring hookup; backup/restore procedure tested

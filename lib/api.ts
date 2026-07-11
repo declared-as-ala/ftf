@@ -56,6 +56,14 @@ export function apiError(error: unknown, context: string): NextResponse {
   return NextResponse.json({ error: 'Erreur interne du serveur' }, { status: 500 });
 }
 
+/**
+ * Échappe les métacaractères regex d'une saisie utilisateur avant usage
+ * dans `$regex` (protection injection regex / ReDoS).
+ */
+export function escapeRegex(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export interface Pagination {
   page: number;
   limit: number;

@@ -16,7 +16,6 @@ import {
   Settings,
   BarChart3,
   Clipboard,
-  Award,
   AlertTriangle,
   Building2,
   Bell,
@@ -38,10 +37,9 @@ const adminLinks = [
   { href: '/admin/competitions', label: 'Compétitions', icon: Trophy },
   { href: '/admin/classement', label: 'Classement', icon: BarChart3 },
   { href: '/admin/discipline', label: 'Discipline', icon: Shield },
-  { href: '/admin/transferts', label: 'Transferts', icon: FileText },
-  { href: '/admin/licences', label: 'Licences', icon: Award },
+  // Transferts / Licences / Événements : modules gelés hors périmètre v1
+  // (docs/product-specification.md §1) — liens réactivés quand les modules existeront.
   { href: '/admin/arbitres', label: 'Arbitres', icon: Flag },
-  { href: '/admin/evenements', label: 'Événements', icon: AlertTriangle },
   { href: '/admin/saisons', label: 'Saisons', icon: Clipboard },
   { href: '/admin/imports', label: 'Import CSV', icon: Upload },
   { href: '/admin/reports', label: 'Rapports', icon: FileText },

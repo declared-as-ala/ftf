@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Requis par le Dockerfile (COPY .next/standalone)
+  output: 'standalone',
   images: {
     remotePatterns: [
       {
@@ -8,6 +10,10 @@ const nextConfig: NextConfig = {
         hostname: process.env.NEXT_PUBLIC_HOSTNAME || '**',
       },
     ],
+    // Logos de clubs et avatars joueurs générés en SVG local (scripts/seed.ts).
+    // CSP sandbox : aucun script exécutable dans les SVG servis.
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   async headers() {
     return [

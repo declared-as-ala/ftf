@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireClub, apiError, parsePagination } from '@/lib/api';
+import { requireClub, apiError, parsePagination, escapeRegex } from '@/lib/api';
 import connectDB from '@/lib/db';
 import Joueur from '@/lib/models/Joueur';
 
@@ -20,10 +20,11 @@ export async function GET(req: Request) {
     if (status) query.status = status;
     if (position) query.position = position;
     if (search) {
+      const safe = escapeRegex(search);
       query.$or = [
-        { nom: { $regex: search, $options: 'i' } },
-        { prenom: { $regex: search, $options: 'i' } },
-        { licence: { $regex: search, $options: 'i' } },
+        { nom: { $regex: safe, $options: 'i' } },
+        { prenom: { $regex: safe, $options: 'i' } },
+        { licence: { $regex: safe, $options: 'i' } },
       ];
     }
 
