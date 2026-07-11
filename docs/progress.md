@@ -204,6 +204,12 @@
 - **Tests run:** `npx tsc --noEmit` clean · **69/69 tests verts** · smoke HTTP réel : login page 200 avec nouveau design ✅ · `/uploads/clubs/EST.svg` 200 `image/svg+xml` ✅ · avatar joueur 200 ✅ · login admin → staff API 200 + staff page 200 ✅ · recherche regex `(((` sans erreur ✅
 - **Remaining issues:** liens gelés réactivables si le périmètre change (décision produit) ; rotation Atlas toujours en attente (user)
 
+### Batch 14 — Fiches joueur enrichies, détail match club, meilleurs buteurs (2026-07-11) ✅
+- **Created:** `lib/services/player-stats.service.ts` (profil statistique partagé : buts avec minutes dérivés des événements des matchs homologués, totaux — matchs/buts/minutes estimées/passes/CJ/CR/suspensions/matchs manqués —, éligibilité avec seuil du règlement, cartons + suspensions peuplés) · `app/api/admin/joueurs/[id]/route.ts` (**la page admin joueur appelait une route inexistante → toujours "Joueur introuvable" — corrigé**) · `components/PlayerProfile.tsx` (fiche partagée FTF_ADMIN + CLUB_ADMIN : en-tête avec photo/badges/éligibilité, 8 tuiles stats, timeline des buts, historique cartons, suspensions) · `app/api/admin/competitions/[id]/top-scorers/route.ts` (agrégation MongoDB des buteurs depuis les événements homologués)
+- **Modified:** `app/api/club/players/[id]/route.ts` (payload stats complet, toujours scopé clubId) · `app/{club/players,admin/joueurs}/[id]/page.tsx` (pages fines → PlayerProfile partagé) · `app/api/club/matches/[id]/route.ts` (+`clubEligibility` : joueurs suspendus/indisponibles + joueurs à risque du club authentifié uniquement — jamais l'adversaire) · `app/club/matches/[id]/page.tsx` (redesign : bandeau navy avec logos/score, film du match aligné domicile/extérieur, **carte "Joueurs suspendus — indisponibles"** + carte "À risque" cliquables vers la fiche joueur) · `app/admin/competitions/[id]/standings/page.tsx` (**section "Meilleurs buteurs"** top 10 avec photos, clubs, liens fiche joueur)
+- **Tests run:** `npx tsc --noEmit` clean · smoke HTTP réel (2 rôles) : admin — stats joueur (6 buts, 22 matchs) ✅, top-scorers (10 buteurs, meilleur 11 buts) ✅, pages 200 ✅ ; club (EST) — stats joueur ✅, match avec `clubEligibility` (8 à risque, seuil 3) ✅, pages 200 ✅ ; **isolation : CLUB_ADMIN sur API admin → 403** ✅
+- **Remaining issues:** minutes affichées = estimation (matchs × 90, libellée comme telle — pas de suivi des remplacements) ; buteurs non affichés côté club standings (extension facile si demandée)
+
 ## Open blockers & user actions
 
 | Item | Owner | Status |

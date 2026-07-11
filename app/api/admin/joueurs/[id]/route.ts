@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireClub, apiError, ApiError } from '@/lib/api';
+import { requireAdmin, apiError, ApiError } from '@/lib/api';
 import connectDB from '@/lib/db';
 import PlayerStatsService from '@/lib/services/player-stats.service';
 
@@ -10,19 +10,18 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { clubId } = await requireClub();
+    await requireAdmin();
     await connectDB();
 
     const { id } = await params;
 
-    // Scopé au club de la session — 404 si le joueur appartient à un autre club
-    const stats = await PlayerStatsService.getFullStats(id, { clubId });
+    const stats = await PlayerStatsService.getFullStats(id);
     if (!stats) {
       throw new ApiError(404, 'Joueur introuvable');
     }
 
     return NextResponse.json(stats);
   } catch (error) {
-    return apiError(error, 'GET /api/club/players/[id]');
+    return apiError(error, 'GET /api/admin/joueurs/[id]');
   }
 }

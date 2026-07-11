@@ -2,9 +2,24 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import Link from 'next/link';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { Trophy, RefreshCw, CheckCircle2, TrendingUp, TrendingDown, Minus, ArrowLeft } from 'lucide-react';
+import { Trophy, RefreshCw, CheckCircle2, TrendingUp, TrendingDown, Minus, ArrowLeft, Goal } from 'lucide-react';
+
+interface TopScorer {
+  _id: string;
+  goals: number;
+  joueur: {
+    _id: string;
+    nom: string;
+    prenom: string;
+    numeroMaillot?: number;
+    photo?: string;
+    position?: string;
+  };
+  club?: { _id: string; nom: string; code?: string; logo?: string };
+}
 
 interface StandingsRow {
   clubId: { _id: string; nom: string; logo?: string; code: string };
@@ -39,6 +54,7 @@ export default function CompetitionStandingsPage() {
   const router = useRouter();
 
   const [standings, setStandings] = useState<StandingsData | null>(null);
+  const [scorers, setScorers] = useState<TopScorer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRebuilding, setIsRebuilding] = useState(false);
   const [message, setMessage] = useState('');
@@ -46,9 +62,15 @@ export default function CompetitionStandingsPage() {
   const fetchStandings = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/admin/competitions/${competitionId}/standings`);
-      const data = await res.json();
-      setStandings(data);
+      const [standingsRes, scorersRes] = await Promise.all([
+        fetch(`/api/admin/competitions/${competitionId}/standings`),
+        fetch(`/api/admin/competitions/${competitionId}/top-scorers`),
+      ]);
+      setStandings(await standingsRes.json());
+      if (scorersRes.ok) {
+        const data = await scorersRes.json();
+        setScorers(data.scorers || []);
+      }
     } catch {
       setStandings({ competitionId, rows: [] });
     } finally {
@@ -201,6 +223,77 @@ export default function CompetitionStandingsPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Meilleurs buteurs ─────────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Goal className="h-4 w-4 text-emerald-600" />
+            Meilleurs buteurs
+          </CardTitle>
+          <CardDescription>
+            Top {scorers.length || 10} — buts comptabilisés sur les matchs homologués
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {scorers.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Aucun but homologué pour le moment.
+            </p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {scorers.map((s, i) => (
+                <Link
+                  key={s._id}
+                  href={`/admin/joueurs/${s.joueur._id}`}
+                  className="flex items-center gap-3 rounded-lg border p-2.5 transition-colors hover:bg-muted/40"
+                >
+                  <span
+                    className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${
+                      i === 0
+                        ? 'bg-amber-400/20 text-amber-600 dark:text-amber-400'
+                        : i === 1
+                          ? 'bg-slate-400/20 text-slate-600 dark:text-slate-300'
+                          : i === 2
+                            ? 'bg-amber-700/20 text-amber-700 dark:text-amber-500'
+                            : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {i + 1}
+                  </span>
+                  <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-muted">
+                    {s.joueur.photo ? (
+                      <img src={s.joueur.photo} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-xs font-bold text-muted-foreground">
+                        {s.joueur.prenom?.[0]}
+                        {s.joueur.nom?.[0]}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">
+                      {s.joueur.prenom} {s.joueur.nom}
+                      {s.joueur.numeroMaillot && (
+                        <span className="font-normal text-muted-foreground"> #{s.joueur.numeroMaillot}</span>
+                      )}
+                    </p>
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      {s.club?.logo && (
+                        <img src={s.club.logo} alt="" className="h-3.5 w-3.5 object-contain" />
+                      )}
+                      <span className="truncate">{s.club?.nom || '—'}</span>
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-xl font-black tabular-nums text-emerald-600 dark:text-emerald-400">
+                    {s.goals}
+                  </span>
+                </Link>
+              ))}
             </div>
           )}
         </CardContent>
