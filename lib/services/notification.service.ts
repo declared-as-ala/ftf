@@ -1,5 +1,6 @@
 import Notification from '../models/Notification';
 import type { NotificationType } from '../models/Notification';
+import type mongoose from 'mongoose';
 
 export interface NotifyInput {
   organizationId: string;
@@ -17,7 +18,7 @@ export interface NotifyInput {
  * Uses upsert on dedupeKey so calling twice is always safe.
  */
 export class NotificationService {
-  static async notify(input: NotifyInput) {
+  static async notify(input: NotifyInput, session?: mongoose.ClientSession) {
     const doc = {
       organizationId: input.organizationId,
       recipientClubId: input.recipientClubId,
@@ -31,9 +32,9 @@ export class NotificationService {
 
     // findOneAndUpdate with upsert — dedupeKey unique index ensures idempotency
     await Notification.findOneAndUpdate(
-      { dedupeKey: input.dedupeKey },
+      { organizationId: input.organizationId, dedupeKey: input.dedupeKey },
       { $setOnInsert: { ...doc, dedupeKey: input.dedupeKey } },
-      { upsert: true, new: false }
+      { upsert: true, new: false, session }
     );
   }
 

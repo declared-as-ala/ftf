@@ -36,9 +36,10 @@ function detectImageType(buffer: Buffer): ImageType | null {
 }
 
 /**
- * Valide (taille + type réel) et enregistre une image sous public/uploads/<subDir>/.
- * Le nom de fichier et l'extension sont générés côté serveur.
- * Retourne le chemin public (/uploads/...). Lance UploadError si invalide.
+ * Valide (taille + type réel) et enregistre une image.
+ * Si BLOB_READ_WRITE_TOKEN est défini, enregistre sous Vercel Blob.
+ * Sinon, enregistre localement sous public/uploads/<subDir>/.
+ * Retourne le chemin public ou l'URL du CDN. Lance UploadError si invalide.
  */
 export async function saveImageUpload(file: File, subDir: string, prefix: string): Promise<string> {
   if (file.size > MAX_UPLOAD_BYTES) {
@@ -52,6 +53,23 @@ export async function saveImageUpload(file: File, subDir: string, prefix: string
     throw new UploadError("Format d'image non supporté (PNG, JPEG ou WebP requis)");
   }
 
+  // 1. Sauvegarde sur Vercel Blob si disponible
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    try {
+      const { put } = await import('@vercel/blob');
+      const fileName = `${subDir}/${prefix}-${Date.now()}-${Math.round(Math.random() * 1e6)}.${type.ext}`;
+      const blobResult = await put(fileName, buffer, {
+        access: 'public',
+        contentType: type.mime,
+      });
+      return blobResult.url;
+    } catch (e: any) {
+      console.error('Erreur lors de l\'upload Vercel Blob:', e);
+      throw new UploadError(`Erreur lors du transfert vers le stockage cloud: ${e.message}`);
+    }
+  }
+
+  // 2. Fallback local
   const uploadDir = path.join(process.cwd(), 'public', 'uploads', subDir);
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });

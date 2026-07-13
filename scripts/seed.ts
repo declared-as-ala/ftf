@@ -12,7 +12,7 @@ if (!process.argv.includes('--force')) {
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import connectDB from '../lib/db';
-import { clubLogoSvg, playerAvatarSvg, writeSvgAsset } from './asset-helpers';
+import { clubLogoSvg, playerAvatarSvg, writeSvgAsset, uploadLocalFileToBlob } from './asset-helpers';
 import Organization from '../lib/models/Organization';
 import User from '../lib/models/User';
 import Club from '../lib/models/Club';
@@ -62,6 +62,168 @@ const FIRST_NAMES = ['Ahmed', 'Mohamed', 'Youssef', 'Aziz', 'Rayen', 'Firas', 'O
 const LAST_NAMES = ['Ben Salem', 'Trabelsi', 'Jelassi', 'Mansouri', 'Haddad', 'Gharbi', 'Khalfallah', 'Mabrouk', 'Dridi', 'Ayari', 'Hamrouni', 'Chaabane', 'Ben Amor', 'Msekni', 'Khelifi', 'Abdi', 'Jaziri', 'Chouchane', 'Mejri', 'Touati', 'Ben Hmida', 'Saïdi', 'Ltaief', 'Hajri', 'Romdhane', 'Dhaouadi', 'Chermiti', 'Kacem', 'Nasri', 'Baccouche', 'Ben Youssef', 'Sassi'];
 const REFEREES = [['Sadok', 'Selmi'], ['Haythem', 'Guirat'], ['Amir', 'Loussaief'], ['Naim', 'Hosni'], ['Mahrez', 'Melki'], ['Khalil', 'Jaziri'], ['Yassine', 'Harrouch'], ['Walid', 'Jeridi'], ['Ahmed', 'Dhahri'], ['Mohamed', 'Maarouf']];
 
+interface RealPlayer {
+  prenom: string;
+  nom: string;
+  position: 'Gardien' | 'Défenseur' | 'Milieu' | 'Attaquant';
+  numeroMaillot: number;
+  nationalite: string;
+}
+
+const REAL_PLAYERS: Record<string, RealPlayer[]> = {
+  EST: [
+    { prenom: 'Amanallah', nom: 'Memmiche', position: 'Gardien', numeroMaillot: 1, nationalite: 'Tunisie' },
+    { prenom: 'Bechir', nom: 'Ben Saïd', position: 'Gardien', numeroMaillot: 22, nationalite: 'Tunisie' },
+    { prenom: 'Sedki', nom: 'Debchi', position: 'Gardien', numeroMaillot: 16, nationalite: 'Tunisie' },
+    { prenom: 'Yassine', nom: 'Meriah', position: 'Défenseur', numeroMaillot: 2, nationalite: 'Tunisie' },
+    { prenom: 'Hamza', nom: 'Jelassi', position: 'Défenseur', numeroMaillot: 4, nationalite: 'Tunisie' },
+    { prenom: 'Mohamed Amine', nom: 'Tougaï', position: 'Défenseur', numeroMaillot: 5, nationalite: 'Algérie' },
+    { prenom: 'Mohamed Amine', nom: 'Ben Hamida', position: 'Défenseur', numeroMaillot: 23, nationalite: 'Tunisie' },
+    { prenom: 'Raed', nom: 'Bouchniba', position: 'Défenseur', numeroMaillot: 13, nationalite: 'Tunisie' },
+    { prenom: 'Ayman', nom: 'Ben Mohamed', position: 'Défenseur', numeroMaillot: 3, nationalite: 'Tunisie' },
+    { prenom: 'Elyas', nom: 'Bouzaiene', position: 'Défenseur', numeroMaillot: 15, nationalite: 'Tunisie' },
+    { prenom: 'Youcef', nom: 'Belaïli', position: 'Milieu', numeroMaillot: 10, nationalite: 'Algérie' },
+    { prenom: 'Yan', nom: 'Sasse', position: 'Milieu', numeroMaillot: 20, nationalite: 'Brésil' },
+    { prenom: 'Houssem', nom: 'Tka', position: 'Milieu', numeroMaillot: 8, nationalite: 'Tunisie' },
+    { prenom: 'Mohamed Wael', nom: 'Derbali', position: 'Milieu', numeroMaillot: 6, nationalite: 'Tunisie' },
+    { prenom: 'Zakaria', nom: 'El Ayeb', position: 'Milieu', numeroMaillot: 18, nationalite: 'Tunisie' },
+    { prenom: 'Roger', nom: 'Aholou', position: 'Milieu', numeroMaillot: 17, nationalite: 'Togo' },
+    { prenom: 'Onuche', nom: 'Ogbelu', position: 'Milieu', numeroMaillot: 25, nationalite: 'Nigeria' },
+    { prenom: 'Abdramane', nom: 'Konaté', position: 'Milieu', numeroMaillot: 12, nationalite: 'Côte d’Ivoire' },
+    { prenom: 'Rodrigo', nom: 'Rodrigues', position: 'Attaquant', numeroMaillot: 9, nationalite: 'Brésil' },
+    { prenom: 'Elias', nom: 'Mokwana', position: 'Attaquant', numeroMaillot: 7, nationalite: 'Afrique du Sud' },
+    { prenom: 'Haithem', nom: 'Dhaou', position: 'Attaquant', numeroMaillot: 11, nationalite: 'Tunisie' },
+    { prenom: 'Koussay', nom: 'Maacha', position: 'Attaquant', numeroMaillot: 27, nationalite: 'Tunisie' },
+    { prenom: 'Zineddine', nom: 'Kada', position: 'Attaquant', numeroMaillot: 29, nationalite: 'Algérie' },
+    { prenom: 'Achraf', nom: 'Jabri', position: 'Attaquant', numeroMaillot: 14, nationalite: 'Tunisie' }
+  ],
+  CA: [
+    { prenom: 'Mouez', nom: 'Hassen', position: 'Gardien', numeroMaillot: 16, nationalite: 'Tunisie' },
+    { prenom: 'Ahmed', nom: 'Labidi', position: 'Gardien', numeroMaillot: 1, nationalite: 'Tunisie' },
+    { prenom: 'Wassim', nom: 'Maghzaoui', position: 'Gardien', numeroMaillot: 22, nationalite: 'Tunisie' },
+    { prenom: 'Toufik', nom: 'Cherifi', position: 'Défenseur', numeroMaillot: 4, nationalite: 'Algérie' },
+    { prenom: 'Yassine', nom: 'Bouabid', position: 'Défenseur', numeroMaillot: 5, nationalite: 'Tunisie' },
+    { prenom: 'Houssem', nom: 'Ben Ali', position: 'Défenseur', numeroMaillot: 3, nationalite: 'Tunisie' },
+    { prenom: 'Aziz', nom: 'Ghrissi', position: 'Défenseur', numeroMaillot: 13, nationalite: 'Tunisie' },
+    { prenom: 'Ghaith', nom: 'Zaalouni', position: 'Défenseur', numeroMaillot: 24, nationalite: 'Tunisie' },
+    { prenom: 'Oussema', nom: 'Shili', position: 'Défenseur', numeroMaillot: 18, nationalite: 'Tunisie' },
+    { prenom: 'Ali', nom: 'Youssef', position: 'Défenseur', numeroMaillot: 15, nationalite: 'Libye' },
+    { prenom: 'Ahmed', nom: 'Khalil', position: 'Milieu', numeroMaillot: 8, nationalite: 'Tunisie' },
+    { prenom: 'Bilel', nom: 'Aït Malek', position: 'Milieu', numeroMaillot: 10, nationalite: 'Tunisie' },
+    { prenom: 'Hamza', nom: 'Khadraoui', position: 'Milieu', numeroMaillot: 7, nationalite: 'Tunisie' },
+    { prenom: 'Ibrahim', nom: 'Mouchili', position: 'Milieu', numeroMaillot: 12, nationalite: 'Cameroun' },
+    { prenom: 'Zakarie', nom: 'Labidi', position: 'Milieu', numeroMaillot: 14, nationalite: 'France' },
+    { prenom: 'Saidou', nom: 'Khan', position: 'Milieu', numeroMaillot: 17, nationalite: 'Gambie' },
+    { prenom: 'Kenneth', nom: 'Semakula', position: 'Milieu', numeroMaillot: 6, nationalite: 'Ouganda' },
+    { prenom: 'Firas', nom: 'Chaouat', position: 'Attaquant', numeroMaillot: 9, nationalite: 'Tunisie' },
+    { prenom: 'Kingsley', nom: 'Eduwo', position: 'Attaquant', numeroMaillot: 11, nationalite: 'Nigeria' },
+    { prenom: 'Adem', nom: 'Garreb', position: 'Attaquant', numeroMaillot: 19, nationalite: 'Tunisie' },
+    { prenom: 'Phillippe', nom: 'Kinzumbi', position: 'Attaquant', numeroMaillot: 20, nationalite: 'RD Congo' },
+    { prenom: 'Oussama', nom: 'Bouguerra', position: 'Attaquant', numeroMaillot: 29, nationalite: 'Tunisie' },
+    { prenom: 'Hamdi', nom: 'Labidi', position: 'Attaquant', numeroMaillot: 21, nationalite: 'Tunisie' },
+    { prenom: 'Ali', nom: 'Amri', position: 'Attaquant', numeroMaillot: 27, nationalite: 'Tunisie' }
+  ],
+  ESS: [
+    { prenom: 'Sabri', nom: 'Ben Hessen', position: 'Gardien', numeroMaillot: 16, nationalite: 'Tunisie' },
+    { prenom: 'Raed', nom: 'Gazzeh', position: 'Gardien', numeroMaillot: 1, nationalite: 'Tunisie' },
+    { prenom: 'Achraf', nom: 'Krir', position: 'Gardien', numeroMaillot: 22, nationalite: 'Tunisie' },
+    { prenom: 'Nassim', nom: 'Hnid', position: 'Défenseur', numeroMaillot: 4, nationalite: 'Tunisie' },
+    { prenom: 'Houssem', nom: 'Dagdoug', position: 'Défenseur', numeroMaillot: 5, nationalite: 'Tunisie' },
+    { prenom: 'Ghofrane', nom: 'Naouali', position: 'Défenseur', numeroMaillot: 3, nationalite: 'Tunisie' },
+    { prenom: 'Ahmed', nom: 'Horchani', position: 'Défenseur', numeroMaillot: 13, nationalite: 'Tunisie' },
+    { prenom: 'Alphonce', nom: 'Omija', position: 'Défenseur', numeroMaillot: 15, nationalite: 'Kenya' },
+    { prenom: 'Slim', nom: 'Khadhraoui', position: 'Défenseur', numeroMaillot: 23, nationalite: 'Tunisie' },
+    { prenom: 'Nader', nom: 'Ghandri', position: 'Défenseur', numeroMaillot: 24, nationalite: 'Tunisie' },
+    { prenom: 'Oussama', nom: 'Abid', position: 'Milieu', numeroMaillot: 10, nationalite: 'Tunisie' },
+    { prenom: 'Cedrik', nom: 'Gbo', position: 'Milieu', numeroMaillot: 8, nationalite: 'Côte d’Ivoire' },
+    { prenom: 'Mohamed Amine', nom: 'Ben Amor', position: 'Milieu', numeroMaillot: 21, nationalite: 'Tunisie' },
+    { prenom: 'Fadi', nom: 'Ben Choug', position: 'Milieu', numeroMaillot: 14, nationalite: 'Tunisie' },
+    { prenom: 'Mokhles', nom: 'Chouchane', position: 'Milieu', numeroMaillot: 6, nationalite: 'Tunisie' },
+    { prenom: 'Mohamed Aziz', nom: 'Jebali', position: 'Milieu', numeroMaillot: 17, nationalite: 'Tunisie' },
+    { prenom: 'Jacques', nom: 'Mbamba', position: 'Milieu', numeroMaillot: 18, nationalite: 'Congo' },
+    { prenom: 'Yassine', nom: 'Chamakhi', position: 'Attaquant', numeroMaillot: 9, nationalite: 'Tunisie' },
+    { prenom: 'Maher', nom: 'Ben Sghaier', position: 'Attaquant', numeroMaillot: 11, nationalite: 'Tunisie' },
+    { prenom: 'Zinedine', nom: 'Boutmène', position: 'Attaquant', numeroMaillot: 7, nationalite: 'Algérie' },
+    { prenom: 'Cristo', nom: 'González', position: 'Attaquant', numeroMaillot: 20, nationalite: 'Espagne' },
+    { prenom: 'Raki', nom: 'Aouani', position: 'Attaquant', numeroMaillot: 27, nationalite: 'Tunisie' },
+    { prenom: 'Salah', nom: 'Barhoumi', position: 'Attaquant', numeroMaillot: 29, nationalite: 'Tunisie' },
+    { prenom: 'Wassourou', nom: 'Samaké', position: 'Attaquant', numeroMaillot: 14, nationalite: 'Mali' }
+  ],
+  CSS: [
+    { prenom: 'Aymen', nom: 'Dahmen', position: 'Gardien', numeroMaillot: 1, nationalite: 'Tunisie' },
+    { prenom: 'Mohamed Hedi', nom: 'Gaaloul', position: 'Gardien', numeroMaillot: 16, nationalite: 'Tunisie' },
+    { prenom: 'Mohamed Ali', nom: 'Jamia', position: 'Gardien', numeroMaillot: 22, nationalite: 'Tunisie' },
+    { prenom: 'Kevin', nom: 'Mondeko', position: 'Défenseur', numeroMaillot: 4, nationalite: 'RD Congo' },
+    { prenom: 'Hamza', nom: 'Mathlouthi', position: 'Défenseur', numeroMaillot: 5, nationalite: 'Tunisie' },
+    { prenom: 'Ali', nom: 'Maâloul', position: 'Défenseur', numeroMaillot: 12, nationalite: 'Tunisie' },
+    { prenom: 'Hichem', nom: 'Baccar', position: 'Défenseur', numeroMaillot: 3, nationalite: 'Tunisie' },
+    { prenom: 'Rayen', nom: 'Derbali', position: 'Défenseur', numeroMaillot: 13, nationalite: 'Tunisie' },
+    { prenom: 'Mohamed Salah', nom: 'Mhadhebi', position: 'Défenseur', numeroMaillot: 2, nationalite: 'Tunisie' },
+    { prenom: 'Youssef', nom: 'Habchia', position: 'Défenseur', numeroMaillot: 15, nationalite: 'Tunisie' },
+    { prenom: 'Mohamed Amine', nom: 'Ben Ali', position: 'Défenseur', numeroMaillot: 23, nationalite: 'Tunisie' },
+    { prenom: 'Chaouki', nom: 'Ben Khader', position: 'Défenseur', numeroMaillot: 24, nationalite: 'Tunisie' },
+    { prenom: 'Travis', nom: 'Mutyaba', position: 'Milieu', numeroMaillot: 10, nationalite: 'Ouganda' },
+    { prenom: 'Baraket', nom: 'Hmidi', position: 'Milieu', numeroMaillot: 8, nationalite: 'Tunisie' },
+    { prenom: 'Firas', nom: 'Sekkouhi', position: 'Milieu', numeroMaillot: 14, nationalite: 'Tunisie' },
+    { prenom: 'Jasser', nom: 'Maaroufi', position: 'Milieu', numeroMaillot: 6, nationalite: 'Tunisie' },
+    { prenom: 'Mohamed', nom: 'Absi', position: 'Milieu', numeroMaillot: 18, nationalite: 'Tunisie' },
+    { prenom: 'Koffi', nom: 'Kouamé', position: 'Milieu', numeroMaillot: 17, nationalite: 'Côte d’Ivoire' },
+    { prenom: 'Emmanuel', nom: 'Ogbole', position: 'Attaquant', numeroMaillot: 9, nationalite: 'Nigeria' },
+    { prenom: 'Iyed', nom: 'Belwafi', position: 'Attaquant', numeroMaillot: 7, nationalite: 'Tunisie' },
+    { prenom: 'Youssef', nom: 'Becha', position: 'Attaquant', numeroMaillot: 11, nationalite: 'Tunisie' },
+    { prenom: 'Mohamed', nom: 'Sekrafi', position: 'Attaquant', numeroMaillot: 19, nationalite: 'Tunisie' },
+    { prenom: 'Fousseyni', nom: 'Soumah', position: 'Attaquant', numeroMaillot: 20, nationalite: 'Guinée' },
+    { prenom: 'Hazem', nom: 'Haj Hassen', position: 'Attaquant', numeroMaillot: 27, nationalite: 'Tunisie' }
+  ],
+  ST: [
+    { prenom: 'Sami', nom: 'Helal', position: 'Gardien', numeroMaillot: 1, nationalite: 'Tunisie' },
+    { prenom: 'Bilel', nom: 'Mejri', position: 'Attaquant', numeroMaillot: 9, nationalite: 'Tunisie' },
+    { prenom: 'Haythem', nom: 'Jouini', position: 'Attaquant', numeroMaillot: 10, nationalite: 'Tunisie' },
+    { prenom: 'Ghazi', nom: 'Ayadi', position: 'Milieu', numeroMaillot: 8, nationalite: 'Tunisie' },
+    { prenom: 'Youssouf', nom: 'Oumarou', position: 'Milieu', numeroMaillot: 17, nationalite: 'Niger' },
+    { prenom: 'Wassim', nom: 'Karoui', position: 'Milieu', numeroMaillot: 6, nationalite: 'Tunisie' }
+  ],
+  USM: [
+    { prenom: 'Sadok', nom: 'Yeddes', position: 'Gardien', numeroMaillot: 16, nationalite: 'Tunisie' },
+    { prenom: 'Chiheb', nom: 'Salhi', position: 'Défenseur', numeroMaillot: 4, nationalite: 'Tunisie' },
+    { prenom: 'Fabrice', nom: 'Zeguei', position: 'Défenseur', numeroMaillot: 5, nationalite: 'Côte d’Ivoire' },
+    { prenom: 'Moses', nom: 'Orkuma', position: 'Milieu', numeroMaillot: 8, nationalite: 'Nigeria' },
+    { prenom: 'Houssem', nom: 'Teka', position: 'Milieu', numeroMaillot: 10, nationalite: 'Tunisie' },
+    { prenom: 'Ahmed', nom: 'Jafeli', position: 'Attaquant', numeroMaillot: 9, nationalite: 'Tunisie' }
+  ]
+};
+
+const PLAYER_AVATARS = [
+  '/uploads/joueurs/avatar_1.png',
+  '/uploads/joueurs/avatar_2.png',
+  '/uploads/joueurs/avatar_3.png',
+  '/uploads/joueurs/avatar_4.png'
+];
+
+let firasChaouatGoals = 0;
+function pickScorer(players: any[], r: number, game: number, g: number, clubCode?: string) {
+  if (clubCode === 'CA') {
+    const chaouat = players.find(p => p.nom === 'Chaouat' && p.prenom === 'Firas');
+    if (chaouat && firasChaouatGoals < 15 && (g === 0 || random() < 0.6)) {
+      firasChaouatGoals++;
+      return chaouat;
+    }
+  }
+  const forwards = players.filter(p => p.position === 'Attaquant' || p.position === 'Milieu');
+  const keyScorers = forwards.filter(p => 
+    ['Belaïli', 'Rodrigues', 'Mokwana', 'Aït Malek', 'Chaouat', 'Eduwo', 'Bouguerra', 'Khadraoui', 'González', 'Boutmène', 'Ogbole', 'Mejri', 'Jouini'].includes(p.nom)
+  );
+  if (keyScorers.length > 0 && (r + game + g) % 2 === 0) {
+    return pick(keyScorers);
+  }
+  return pick(forwards.length > 0 ? forwards : players);
+}
+
+function pickCarded(players: any[]) {
+  const candidates = players.filter(p => p.position === 'Défenseur' || p.position === 'Milieu');
+  return pick(candidates.length > 0 ? candidates : players);
+}
+
 let randomState = 20252026;
 function random() {
   randomState = (randomState * 1664525 + 1013904223) >>> 0;
@@ -91,7 +253,11 @@ async function seed() {
   console.log(`Base ciblée : ${mongoose.connection.db.databaseName}`);
   console.log('Suppression de toutes les données...');
   const existingCollections = await mongoose.connection.db.listCollections({}, { nameOnly: true }).toArray();
-  await Promise.all(existingCollections.map(({ name }) => mongoose.connection.db!.collection(name).deleteMany({})));
+  for (const col of existingCollections) {
+    if (col.name.startsWith('system.')) continue;
+    console.log(`  Vider la collection : ${col.name}`);
+    await mongoose.connection.db.collection(col.name).deleteMany({});
+  }
 
   const org = await Organization.create({ name: 'Fédération Tunisienne de Football', code: 'FTF', type: 'FEDERATION', active: true });
   const season = await Saison.create({
@@ -103,32 +269,68 @@ async function seed() {
   const clubPassword = await bcrypt.hash('Club@123', 10);
   const admin = await User.create({ organizationId: org._id, email: 'admin@ftf.tn', password: adminPassword, name: 'Administrateur FTF', role: 'FTF_ADMIN', status: 'ACTIVE' });
 
-  const clubs = await Club.insertMany(CLUBS.map(c => ({
-    organizationId: org._id, nom: c.nom, code: c.code, slug: slug(c.nom), shortName: c.shortName, status: 'ACTIVE',
-    logo: writeSvgAsset('clubs', `${c.code}.svg`, clubLogoSvg(c.code, c.couleurs)),
-    stade: c.stade, ville: c.ville, couleurs: c.couleurs, fondation: c.fondation,
-    emailOfficiel: `${c.code.toLowerCase()}@clubs.ftf.tn`, capaciteStade: c.capacite,
-    description: `Club participant à la Ligue Professionnelle 1 2025-2026.`, equipesJeunes: ['U19', 'U21'], equipesFeminines: [], documentsAccreditation: [],
-  })));
+  const clubDocs: any[] = [];
+  for (const c of CLUBS) {
+    const logoUrl = await writeSvgAsset('clubs', `${c.code}.svg`, clubLogoSvg(c.code, c.couleurs));
+    clubDocs.push({
+      organizationId: org._id, nom: c.nom, code: c.code, slug: slug(c.nom), shortName: c.shortName, status: 'ACTIVE',
+      logo: logoUrl, stade: c.stade, ville: c.ville, couleurs: c.couleurs, fondation: c.fondation,
+      emailOfficiel: `${c.code.toLowerCase()}@clubs.ftf.tn`, capaciteStade: c.capacite,
+      description: `Club participant à la Ligue Professionnelle 1 2025-2026.`, equipesJeunes: ['U19', 'U21'], equipesFeminines: [], documentsAccreditation: [],
+    });
+  }
+  const clubs = await Club.insertMany(clubDocs);
   await User.insertMany(clubs.map((club, i) => ({ organizationId: org._id, email: `${CLUBS[i].code.toLowerCase()}@club.ftf.tn`, password: clubPassword, name: `Administrateur ${CLUBS[i].shortName}`, role: 'CLUB_ADMIN', status: 'ACTIVE', clubId: club._id })));
+
+  const playerAvatarUrls = [...PLAYER_AVATARS];
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    console.log('Transfert des avatars joueurs vers Vercel Blob...');
+    for (let i = 0; i < PLAYER_AVATARS.length; i++) {
+      playerAvatarUrls[i] = await uploadLocalFileToBlob(PLAYER_AVATARS[i], 'joueurs', `avatar_${i + 1}.png`);
+    }
+  }
 
   const playersByClub = new Map<string, any[]>();
   const playerDocs: any[] = [];
   clubs.forEach((club, clubIndex) => {
     const squad: any[] = [];
+    const clubCode = CLUBS[clubIndex].code;
+    const realClubPlayers = REAL_PLAYERS[clubCode] || [];
+
     for (let i = 0; i < 24; i++) {
-      const position = i < 3 ? 'Gardien' : i < 11 ? 'Défenseur' : i < 18 ? 'Milieu' : 'Attaquant';
-      const prenom = FIRST_NAMES[(clubIndex * 7 + i) % FIRST_NAMES.length];
-      const nom = LAST_NAMES[(clubIndex * 11 + i * 3) % LAST_NAMES.length];
-      const licence = `FTF-25-${CLUBS[clubIndex].code}-${String(i + 1).padStart(3, '0')}`;
-      const initials = `${prenom[0]}${nom[0]}`.toUpperCase();
+      let prenom = '';
+      let nom = '';
+      let position: 'Gardien' | 'Défenseur' | 'Milieu' | 'Attaquant';
+      let numeroMaillot = i + 1;
+      let nationalite = 'Tunisie';
+
+      if (i < realClubPlayers.length) {
+        prenom = realClubPlayers[i].prenom;
+        nom = realClubPlayers[i].nom;
+        position = realClubPlayers[i].position;
+        numeroMaillot = realClubPlayers[i].numeroMaillot;
+        nationalite = realClubPlayers[i].nationalite;
+      } else {
+        position = i < 3 ? 'Gardien' : i < 11 ? 'Défenseur' : i < 18 ? 'Milieu' : 'Attaquant';
+        prenom = FIRST_NAMES[(clubIndex * 7 + i) % FIRST_NAMES.length];
+        nom = LAST_NAMES[(clubIndex * 11 + i * 3) % LAST_NAMES.length];
+        numeroMaillot = i + 1;
+        while (realClubPlayers.some(p => p.numeroMaillot === numeroMaillot)) {
+          numeroMaillot++;
+        }
+        nationalite = i > 20 ? pick(['Algérie', 'Mali', 'Sénégal', 'Côte d’Ivoire']) : 'Tunisie';
+      }
+
+      const licence = `FTF-25-${clubCode}-${String(i + 1).padStart(3, '0')}`;
+      const photo = playerAvatarUrls[(clubIndex * 7 + i) % playerAvatarUrls.length];
+
       const doc = {
         organizationId: org._id, clubId: club._id, prenom, nom, displayName: `${prenom} ${nom}`,
         licence,
-        photo: writeSvgAsset('joueurs', `${licence}.svg`, playerAvatarSvg(initials, CLUBS[clubIndex].couleurs)),
-        nationalite: i > 20 ? pick(['Algérie', 'Mali', 'Sénégal', 'Côte d’Ivoire']) : 'Tunisie', position,
+        photo,
+        nationalite, position,
         dateNaissance: new Date(Date.UTC(1996 + ((clubIndex + i) % 9), (i * 3) % 12, 1 + ((i * 5) % 27))),
-        numeroMaillot: i + 1, taille: 170 + ((i * 7 + clubIndex) % 22), poids: 65 + ((i * 5 + clubIndex) % 20),
+        numeroMaillot, taille: 170 + ((i * 7 + clubIndex) % 22), poids: 65 + ((i * 5 + clubIndex) % 20),
         piedPrefere: i % 7 === 0 ? 'Les deux' : i % 3 === 0 ? 'Gauche' : 'Droit', category: 'Sénior', status: 'ACTIVE',
         stats: { matchsJoues: 0, buts: 0, passes: 0, cartonsJaunes: 0, cartonsRouges: 0 }, licenceValide: true,
         licenceExpirationDate: new Date('2026-06-30T23:59:59Z'), sanctions: [], transferts: [], carriereHistorique: [],
@@ -156,7 +358,92 @@ async function seed() {
   const rounds: any[] = [];
   for (let n = 1; n <= 30; n++) {
     const date = new Date('2025-08-09T15:00:00Z'); date.setUTCDate(date.getUTCDate() + (n - 1) * 7);
-    rounds.push(await Round.create({ organizationId: org._id, competitionId: competition._id, saisonId: season._id, number: n, name: `Journée ${n}`, dateDebut: date, dateFin: new Date(date.getTime() + 86400000), status: n <= 22 ? 'COMPLETED' : n === 23 ? 'ACTIVE' : 'SCHEDULED', active: true }));
+    rounds.push(await Round.create({ organizationId: org._id, competitionId: competition._id, saisonId: season._id, number: n, name: `Journée ${n}`, dateDebut: date, dateFin: new Date(date.getTime() + 86400000), status: 'COMPLETED', active: true }));
+  }
+
+  // Solve for match outcomes to match the real 2025-2026 standings!
+  const TARGETS: Record<string, { w: number; d: number; l: number }> = {
+    CA:   { w: 20, d: 6,  l: 4 },
+    EST:  { w: 20, d: 3,  l: 7 },
+    CSS:  { w: 20, d: 2,  l: 8 },
+    ST:   { w: 12, d: 12, l: 6 },
+    USM:  { w: 11, d: 12, l: 7 },
+    ESZ:  { w: 10, d: 11, l: 9 },
+    ESS:  { w: 11, d: 8,  l: 11 },
+    ESM:  { w: 10, d: 10, l: 10 },
+    JSO:  { w: 10, d: 6,  l: 14 },
+    USBG: { w: 8,  d: 11, l: 11 },
+    ASM:  { w: 8,  d: 11, l: 11 },
+    CAB:  { w: 8,  d: 9,  l: 13 },
+    OB:   { w: 7,  d: 11, l: 12 },
+    JSK:  { w: 9,  d: 4,  l: 17 },
+    ASS:  { w: 5,  d: 12, l: 13 },
+    ASG:  { w: 4,  d: 6,  l: 20 }
+  };
+
+  const solvedMatchesMap = new Map<string, number>(); // key: `${homeCode}-${awayCode}`, value: outcome (1, 0, -1)
+  const solvedList: Array<{ home: string; away: string; outcome: number }> = [];
+  const clubCodes = CLUBS.map(c => c.code);
+
+  for (let r = 0; r < schedule.length; r++) {
+    for (let game = 0; game < schedule[r].length; game++) {
+      const [hi, ai] = schedule[r][game];
+      solvedList.push({ home: clubCodes[hi], away: clubCodes[ai], outcome: 0 });
+    }
+  }
+
+  function getRecords(matchList: typeof solvedList) {
+    const records: Record<string, { w: number; d: number; l: number }> = {};
+    for (const c of clubCodes) records[c] = { w: 0, d: 0, l: 0 };
+    for (const m of matchList) {
+      if (m.outcome === 1) {
+        records[m.home].w++; records[m.away].l++;
+      } else if (m.outcome === -1) {
+        records[m.away].w++; records[m.home].l++;
+      } else {
+        records[m.home].d++; records[m.away].d++;
+      }
+    }
+    return records;
+  }
+
+  function getError(records: ReturnType<typeof getRecords>) {
+    let error = 0;
+    for (const c of clubCodes) {
+      const target = TARGETS[c]; const rec = records[c];
+      error += Math.abs(target.w - rec.w) + Math.abs(target.d - rec.d) + Math.abs(target.l - rec.l);
+    }
+    return error;
+  }
+
+  let solved = false;
+  for (let restart = 0; restart < 500; restart++) {
+    for (const m of solvedList) m.outcome = [0, 1, -1][Math.floor(random() * 3)];
+    let step = 0;
+    let lastError = getError(getRecords(solvedList));
+    while (step < 5000) {
+      if (lastError === 0) { solved = true; break; }
+      const matchIdx = Math.floor(random() * solvedList.length);
+      const m = solvedList[matchIdx];
+      const oldVal = m.outcome;
+      const newVal = [0, 1, -1].filter(o => o !== oldVal)[Math.floor(random() * 2)];
+      m.outcome = newVal;
+      const newRecords = getRecords(solvedList);
+      const newError = getError(newRecords);
+      if (newError < lastError) {
+        lastError = newError;
+      } else if (newError === lastError && random() < 0.1) {
+        lastError = newError;
+      } else {
+        m.outcome = oldVal;
+      }
+      step++;
+    }
+    if (solved) break;
+  }
+
+  for (const m of solvedList) {
+    solvedMatchesMap.set(`${m.home}-${m.away}`, m.outcome);
   }
 
   const matchDocs: any[] = [];
@@ -165,18 +452,44 @@ async function seed() {
     for (let game = 0; game < schedule[r].length; game++) {
       const [hi, ai] = schedule[r][game]; const home = clubs[hi]; const away = clubs[ai];
       const date = new Date(rounds[r].dateDebut); date.setUTCHours(game % 3 === 0 ? 13 : game % 3 === 1 ? 15 : 17, game % 2 ? 30 : 0);
-      const completed = r < 22; const postponed = r === 22 && game === 2; const draft = r === 22 && game < 5 && !postponed;
-      const homeScore = completed || draft ? Math.floor(random() * 4) : 0; const awayScore = completed || draft ? Math.floor(random() * 3) : 0;
+      const completed = true; const postponed = false; const draft = false;
+
+      const outcome = solvedMatchesMap.get(`${home.code}-${away.code}`) ?? 0;
+      let homeScore = 0;
+      let awayScore = 0;
+
+      if (outcome === 1) {
+        homeScore = 1 + Math.floor(random() * 3);
+        awayScore = Math.floor(random() * homeScore);
+      } else if (outcome === -1) {
+        awayScore = 1 + Math.floor(random() * 3);
+        homeScore = Math.floor(random() * awayScore);
+      } else {
+        homeScore = Math.floor(random() * 3);
+        awayScore = homeScore;
+      }
+
       const events: any[] = [];
       const homePlayers = playersByClub.get(String(home._id))!; const awayPlayers = playersByClub.get(String(away._id))!;
-      for (let g = 0; g < homeScore; g++) events.push({ type: 'But', minute: 8 + ((g * 23 + game * 7 + r) % 82), joueurId: homePlayers[17 + ((g + r + game) % 7)]._id, equipe: 'home', description: g % 4 === 0 ? 'Penalty' : 'But' });
-      for (let g = 0; g < awayScore; g++) events.push({ type: 'But', minute: 12 + ((g * 27 + game * 5 + r) % 78), joueurId: awayPlayers[17 + ((g + r + game + 2) % 7)]._id, equipe: 'away', description: 'But' });
+      for (let g = 0; g < homeScore; g++) {
+        const scorer = pickScorer(homePlayers, r, game, g, home.code);
+        events.push({ type: 'But', minute: 8 + ((g * 23 + game * 7 + r) % 82), joueurId: scorer._id, equipe: 'home', description: g % 4 === 0 ? 'Penalty' : 'But' });
+      }
+      for (let g = 0; g < awayScore; g++) {
+        const scorer = pickScorer(awayPlayers, r, game, g, away.code);
+        events.push({ type: 'But', minute: 12 + ((g * 27 + game * 5 + r) % 78), joueurId: scorer._id, equipe: 'away', description: 'But' });
+      }
       if (completed || draft) {
         for (let y = 0; y < 2 + ((r + game) % 4); y++) {
-          const side = (y + game) % 2 === 0 ? 'home' : 'away'; const squad = side === 'home' ? homePlayers : awayPlayers;
-          events.push({ type: 'Carton Jaune', minute: 18 + ((y * 17 + r * 3) % 70), joueurId: squad[3 + ((r + game + y * 2) % 15)]._id, equipe: side, description: pick(['Faute tactique', 'Jeu dangereux', 'Contestation', 'Anti-jeu']) });
+          const side = (y + game) % 2 === 0 ? 'home' : 'away';
+          const squad = side === 'home' ? homePlayers : awayPlayers;
+          const carded = pickCarded(squad);
+          events.push({ type: 'Carton Jaune', minute: 18 + ((y * 17 + r * 3) % 70), joueurId: carded._id, equipe: side, description: pick(['Faute tactique', 'Jeu dangereux', 'Contestation', 'Anti-jeu']) });
         }
-        if ((r * 8 + game) % 31 === 0) events.push({ type: 'Carton Rouge', minute: 62 + ((r + game) % 25), joueurId: awayPlayers[4 + ((r + game) % 12)]._id, equipe: 'away', description: 'Faute grave' });
+        if ((r * 8 + game) % 31 === 0) {
+          const carded = pickCarded(awayPlayers);
+          events.push({ type: 'Carton Rouge', minute: 62 + ((r + game) % 25), joueurId: carded._id, equipe: 'away', description: 'Faute grave' });
+        }
       }
       events.sort((a, b) => a.minute - b.minute);
       matchDocs.push({ organizationId: org._id, saisonId: season._id, competitionId: competition._id, roundId: rounds[r]._id, journee: r + 1, homeClubId: home._id, awayClubId: away._id, date, stade: home.stade, scoreHome: homeScore, scoreAway: awayScore, statut: postponed ? 'Reporté' : completed ? 'Terminé' : draft ? 'Brouillon' : 'Programmé', isOfficial: true, homologue: completed, validePar: completed ? admin._id : undefined, dateValidation: completed ? new Date(date.getTime() + 3 * 3600000) : undefined, processingVersion: completed ? 1 : 0, arbitrePrincipalId: referees[(r * 8 + game) % referees.length]._id, evenements: events, spectateurs: completed ? 1200 + Math.floor(random() * Math.min(home.capaciteStade || 12000, 35000)) : undefined, public: true });

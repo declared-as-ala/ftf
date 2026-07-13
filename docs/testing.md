@@ -84,3 +84,68 @@
 ## 7. Definition of done (testing) per batch
 
 Every batch ships with: tests for its new logic green · `npx tsc --noEmit` clean · previously green suites still green · test names/results recorded in [progress.md](progress.md).
+
+## 8. Official match workspace test matrix (planned)
+
+These are named release criteria, not optional UI snapshots.
+
+### 8.1 Aggregate and event validation
+
+| Case | Expected |
+|---|---|
+| Goal / penalty goal | credited club score increments; scorer belongs to that participating club at match date |
+| Own goal | player belongs to conceding club; opponent score increments exactly once |
+| Assist validation | assist belongs to credited club and differs from scorer; invalid/cross-club IDs rejected |
+| Card recipient | player belongs to selected participating club; wrong-club record rejected or persisted as a reviewable anomaly only through explicit policy flow |
+| Minute bounds | normal and stoppage minutes accepted at boundaries; negative/impossible values rejected |
+| Event retry | same `(matchId, clientMutationId)` returns the original event; no duplicate |
+| Same player/same minute | suspicious duplicate warns; two explicitly distinct legitimate events can coexist |
+| Event cancel | draft event is soft-cancelled with actor/reason; history remains; derived preview updates |
+| Read detail | stored score, including forfeit/admin score, is returned unchanged; GET performs no writes/recalculation |
+
+### 8.2 Finalization and correction integrity
+
+| Case | Expected |
+|---|---|
+| Score equals structured goals | finalize succeeds and confirms one set of events/effects |
+| Non-zero score, zero goals | 422 unless an allowed documented override is supplied |
+| Goal mismatch | structured expected/actual error; allowed override is actor/time/reason audited |
+| Inject failure in discipline | transaction rolls back match/cards/suspensions/ledger/outbox/audit |
+| Sequential duplicate finalize | second response is idempotent; no duplicate card, suspension, notification, stats or standings effect |
+| Concurrent finalize | one processing version wins; stale caller gets original result or 409; database remains complete |
+| Edit official match | 409 even if client sends draft-looking payload |
+| Reopen without reason | rejected |
+| Reopen with yellow threshold effect | cards/consumption/suspension/ledger/eligibility/notifications/stats/standings deterministically reverse or rebuild |
+| Re-finalize after correction | exactly one correct final state; cancelled old source effects are not counted |
+| Ledger crash/retry | ledger row and decrement commit atomically; retry cannot double-decrement or strand an undecremented unique row |
+
+### 8.3 Discipline rules and anomalies
+
+- First/second/threshold yellow across applicable official matches, with consumed cards never reused.
+- Yellow plus second-yellow dismissal in one match does not double-count accumulation.
+- Direct red creates indefinite provisional ineligibility without assuming one final match; confirmed/reduced/extended/cancelled/already-served decisions compute remaining correctly.
+- RuleSet selection is deterministic by organization, season, competition, version/effective date; cross-organization and wrong historical versions are rejected.
+- Official, postponed, cancelled, abandoned, replay, no-kickoff, interrupted, forfeit by each club, wrong competition/category, and cross-season serving decisions each produce the correct ledger reason.
+- Suspended scorer/card recipient and wrong-club event produce one persisted anomaly; explicit confirmation is reasoned/audited and does not auto-apply forfeits/fines.
+- `MatchDisciplineImpact` agrees with source cards, suspensions, ledger, notification recipients, and next applicable match after retries/rebuilds.
+
+### 8.4 Authorization and data leakage
+
+| Actor/case | Expected |
+|---|---|
+| Anonymous | 401 on every workspace endpoint |
+| `CLUB_ADMIN` calls `/api/admin/matches/*` | 403, including event/finalize/reopen/report routes |
+| Admin from organization B | 404/403 without match existence leakage; no mutation or audit access |
+| Participating club | allowlisted official/public DTO plus own eligibility/notifications only |
+| Non-participating club | 404/403 |
+| Club payload inspection | no internal notes, referee report, override rationale, audit, draft/cancelled events, unpublished officials, or opponent eligibility |
+| Malicious IDs/body | invalid ObjectIds, extra fields, unsafe report/action paths, oversized text rejected before database mutation |
+
+### 8.5 UI, accessibility, and end-to-end
+
+- Keyboard-only traversal of the seven tabs, forms, event drawer, confirmation dialogs and return focus; correct ARIA tab semantics and live announcements.
+- Visual/functional checks at 375/768/1024/1440 px: no horizontal page scroll, readable score header, 44 px targets, 4.5:1 contrast, no hover-only action.
+- Per-tab skeleton, empty, error, denied, validation, draft/read-only, official, stale-version, transaction-failure and retry states.
+- E2E-3: create draft → enter goals/cards → mismatch blocked → correct → finalize → discipline/club notification/public detail visible → reasoned reopen → correct event → re-finalize → one rebuilt effect set.
+- E2E-4: direct red → provisional club visibility → decision → next eligible match serving → report/history; replay twice to prove idempotency.
+- Phase 9 contract test: draft officials invisible, published officials visible. Phase 10 contract test: each participating club receives exactly one recipient delivery per event version.

@@ -44,17 +44,19 @@ export class EligibilityService {
     homeClubId: string,
     awayClubId: string,
     saisonId: string,
-    yellowThreshold: number
+    yellowThreshold: number,
+    organizationId: string
   ): Promise<{ home: PlayerEligibility[]; away: PlayerEligibility[] }> {
     const [homePlayers, awayPlayers] = await Promise.all([
-      Joueur.find({ clubId: homeClubId, status: 'ACTIVE' }).lean(),
-      Joueur.find({ clubId: awayClubId, status: 'ACTIVE' }).lean(),
+      Joueur.find({ organizationId, clubId: homeClubId, status: 'ACTIVE' }).lean(),
+      Joueur.find({ organizationId, clubId: awayClubId, status: 'ACTIVE' }).lean(),
     ]);
 
     const allClubIds = [homeClubId, awayClubId];
 
     // All active/provisional suspensions for both clubs
     const suspensions = await Suspension.find({
+      organizationId,
       clubId: { $in: allClubIds },
       status: { $in: ['ACTIVE', 'PROVISIONAL'] },
     }).lean();
@@ -69,6 +71,7 @@ export class EligibilityService {
 
     // Active yellow count per player for this season
     const yellowCards = await DisciplinaryCard.find({
+      organizationId,
       clubId: { $in: allClubIds },
       saisonId,
       cardType: 'YELLOW',
@@ -132,6 +135,7 @@ export class EligibilityService {
     if (participantIds.length === 0) return anomalies;
 
     const suspensions = await Suspension.find({
+      organizationId: match.organizationId,
       joueurId: { $in: participantIds },
       status: { $in: ['ACTIVE', 'PROVISIONAL'] },
     }).lean();

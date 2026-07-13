@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 export async function GET(req: Request) {
   try {
-    await requireAdmin();
+    const session = await requireAdmin();
     await connectDB();
 
     const { searchParams } = new URL(req.url);
@@ -19,7 +19,9 @@ export async function GET(req: Request) {
     const to = searchParams.get('to');
     const { skip, limit } = parsePagination(searchParams);
 
-    const query: Record<string, unknown> = {};
+    const query: Record<string, unknown> = {
+      organizationId: session.user.organizationId,
+    };
     if (action) query.action = action;
     if (entityType) query.entityType = entityType;
     if (entityId) query.entityId = entityId;

@@ -1,11 +1,9 @@
 import mongoose from 'mongoose';
 import Match from '../models/Match';
-import Round from '../models/Round';
-import RoundService from './round.service';
-import StandingsService from './standings.service';
 import AuditService from './audit.service';
 import { DisciplineEngine } from './discipline-engine';
 import { SuspensionService } from './suspension.service';
+import MatchProjectionService from './match-projection.service';
 import connectDB from '../db';
 
 export interface FinalizationResult {
@@ -14,25 +12,8 @@ export interface FinalizationResult {
   error?: string;
 }
 
-/**
- * MatchFinalizationService
- *
- * §5.4 requirements:
- *   - Atomic (MongoDB transaction)
- *   - Idempotent (processingVersion claim)
- *   - Protected against concurrent calls (atomic version increment)
- *   - Audited
- *   - Score vs. goal-event validation
- *   - Round completion check after each finalization
- *   - Standings rebuild after each finalization
- *
- * NOTE: Yellow/red card discipline wiring is in Phase 5.
- * This service leaves hooks where Phase 5 will plug in.
- */
+/** Atomic and idempotent officialization of one match. */
 export class MatchFinalizationService {
-  /**
-   * Finalise a single match. Idempotent — safe to call twice.
-   */
   static async finalizeMatch(
     matchId: string | mongoose.Types.ObjectId,
     actorId: string,
@@ -40,14 +21,13 @@ export class MatchFinalizationService {
   ): Promise<FinalizationResult> {
     await connectDB();
 
-    // ── 1. Pre-flight: load match without transaction ────────────────────────
     const match = await Match.findOne({ _id: matchId, organizationId });
     if (!match) {
       return { matchId: matchId.toString(), status: 'error', error: 'Match introuvable' };
     }
 
-    // Already finalized — idempotent return
     if (match.homologue) {
+      await MatchProjectionService.processPendingForMatch(matchId, organizationId, actorId);
       return { matchId: matchId.toString(), status: 'already_finalized' };
     }
 
@@ -59,147 +39,125 @@ export class MatchFinalizationService {
       };
     }
 
-    // ── 2. Validation ────────────────────────────────────────────────────────
     const validationError = this._validateMatch(match);
     if (validationError) {
       return { matchId: matchId.toString(), status: 'error', error: validationError };
     }
 
-    // ── 3. Atomic processingVersion claim — prevents concurrent finalization ─
     const claimedVersion = match.processingVersion;
-    const claimResult = await Match.findOneAndUpdate(
-      { _id: matchId, processingVersion: claimedVersion, homologue: false },
-      { $inc: { processingVersion: 1 } },
-      { new: true }
-    );
-
-    if (!claimResult) {
-      // Another process won the race — return already_finalized
-      return { matchId: matchId.toString(), status: 'already_finalized' };
-    }
-
-    // ── 4. Transaction: write finalization ──────────────────────────────────
+    let finalized = false;
     const session = await mongoose.startSession();
-    session.startTransaction();
 
     try {
-      // Mark finalized
-      await Match.findByIdAndUpdate(
-        matchId,
-        {
-          homologue: true,
-          statut: 'Terminé',
-          validePar: new mongoose.Types.ObjectId(actorId),
-          dateValidation: new Date(),
-        },
-        { session }
-      );
-
-      // Audit inside the transaction
-      await AuditService.logWithSession(
-        {
-          actor: { id: actorId, role: 'FTF_ADMIN' },
-          action: 'MATCH_FINALIZED',
-          entityType: 'Match',
-          entityId: matchId,
-          after: {
-            scoreHome: match.scoreHome,
-            scoreAway: match.scoreAway,
-            statut: 'Terminé',
-            homologue: true,
-          },
-          organizationId: organizationId.toString(),
-        },
-        session
-      );
-
-      // ── 5. Discipline Engine (inside transaction) ────────────────────────
-      // Processes card events → creates DisciplinaryCard + auto-suspensions
-      try {
-        await DisciplineEngine.processMatchCards(
+      await session.withTransaction(async () => {
+        const claimedMatch = await Match.findOneAndUpdate(
           {
             _id: matchId,
-            competitionId: match.competitionId,
-            saisonId: match.saisonId,
-            roundId: match.roundId,
-            organizationId: match.organizationId,
-            isOfficial: match.isOfficial,
-            homeClubId: match.homeClubId,
-            awayClubId: match.awayClubId,
-            evenements: match.evenements || [],
+            organizationId,
+            processingVersion: claimedVersion,
+            homologue: false,
+          },
+          {
+            $inc: { processingVersion: 1 },
+            $set: {
+              homologue: true,
+              statut: 'Terminé',
+              validePar: new mongoose.Types.ObjectId(actorId),
+              dateValidation: new Date(),
+            },
+          },
+          { new: true, session }
+        );
+
+        if (!claimedMatch) return;
+        finalized = true;
+
+        // Required discipline effects are not best-effort. Any exception aborts
+        // officialization, cards, suspensions, ledger, notifications and audit.
+        await DisciplineEngine.processMatchCards(
+          {
+            _id: claimedMatch._id,
+            competitionId: claimedMatch.competitionId,
+            saisonId: claimedMatch.saisonId,
+            roundId: claimedMatch.roundId,
+            organizationId: claimedMatch.organizationId,
+            isOfficial: claimedMatch.isOfficial,
+            homeClubId: claimedMatch.homeClubId,
+            awayClubId: claimedMatch.awayClubId,
+            date: claimedMatch.date,
+            evenements: claimedMatch.evenements || [],
           },
           session
         );
-      } catch (err) {
-        console.error('[MatchFinalizationService] DisciplineEngine error (non-fatal in tx):', err);
-      }
 
-      await session.commitTransaction();
-      session.endSession();
+        await SuspensionService.processServingForMatch(matchId, organizationId, session);
 
-      // ── 5. Post-commit: rebuild standings + check round completion ─────────
-      // (non-transactional, can be retried independently)
-      try {
-        await StandingsService.rebuildCompetitionStandings(
-          match.competitionId.toString(),
-          actorId
+        await MatchProjectionService.enqueueWithSession(
+          {
+            organizationId,
+            matchId,
+            competitionId: claimedMatch.competitionId,
+            roundId: claimedMatch.roundId,
+            processingVersion: claimedMatch.processingVersion,
+          },
+          session
         );
-      } catch (err) {
-        console.error('[MatchFinalizationService] Standings rebuild error (non-fatal):', err);
-      }
 
-      if (match.roundId) {
-        try {
-          await RoundService.checkRoundCompletion(match.roundId);
-        } catch (err) {
-          console.error('[MatchFinalizationService] Round completion check error (non-fatal):', err);
-        }
-      }
-
-      // ── 6. Post-commit: suspension serving ──────────────────────────────
-      // SuspensionService must run AFTER commit to use stable match state
-      try {
-        await SuspensionService.processServingForMatch(
-          matchId,
-          organizationId
+        await AuditService.logWithSession(
+          {
+            actor: { id: actorId, role: 'FTF_ADMIN' },
+            action: 'MATCH_FINALIZED',
+            entityType: 'Match',
+            entityId: matchId,
+            before: {
+              statut: match.statut,
+              homologue: false,
+              processingVersion: claimedVersion,
+            },
+            after: {
+              scoreHome: claimedMatch.scoreHome,
+              scoreAway: claimedMatch.scoreAway,
+              statut: 'Terminé',
+              homologue: true,
+              processingVersion: claimedMatch.processingVersion,
+            },
+            organizationId: organizationId.toString(),
+          },
+          session
         );
-      } catch (err) {
-        console.error('[MatchFinalizationService] SuspensionService error (non-fatal):', err);
-      }
-
-      return { matchId: matchId.toString(), status: 'finalized' };
-    } catch (err) {
-      await session.abortTransaction();
-      session.endSession();
-      throw err;
+      });
+    } finally {
+      await session.endSession();
     }
+
+    // These projections are rebuildable, but their durable task records were
+    // committed with the match. Failure leaves FAILED work for a safe retry.
+    await MatchProjectionService.processPendingForMatch(matchId, organizationId, actorId);
+
+    return {
+      matchId: matchId.toString(),
+      status: finalized ? 'finalized' : 'already_finalized',
+    };
   }
 
-  /**
-   * Validate match data before finalization.
-   * Returns an error string, or null if valid.
-   */
   private static _validateMatch(match: any): string | null {
-    // Score must be non-negative integers
     if (
-      typeof match.scoreHome !== 'number' ||
-      typeof match.scoreAway !== 'number' ||
+      !Number.isInteger(match.scoreHome) ||
+      !Number.isInteger(match.scoreAway) ||
       match.scoreHome < 0 ||
       match.scoreAway < 0
     ) {
       return 'Les scores doivent être des entiers non négatifs';
     }
 
-    // Goal event count must match score (only if events are present)
     if (match.evenements && match.evenements.length > 0) {
       const homeGoals = match.evenements.filter(
-        (e: any) => e.type === 'But' && e.equipe === 'home'
+        (event: any) => event.type === 'But' && event.equipe === 'home'
       ).length;
       const awayGoals = match.evenements.filter(
-        (e: any) => e.type === 'But' && e.equipe === 'away'
+        (event: any) => event.type === 'But' && event.equipe === 'away'
       ).length;
 
-      // Only validate if both sides have goal events assigned
       if (homeGoals > 0 || awayGoals > 0) {
         if (homeGoals !== match.scoreHome) {
           return `Incohérence : ${homeGoals} but(s) marqué(s) à domicile, score indique ${match.scoreHome}`;
@@ -213,9 +171,6 @@ export class MatchFinalizationService {
     return null;
   }
 
-  /**
-   * Reschedule a postponed match to a new date.
-   */
   static async rescheduleMatch(
     matchId: string | mongoose.Types.ObjectId,
     newDate: Date,
@@ -232,11 +187,9 @@ export class MatchFinalizationService {
     const before = { date: match.date, statut: match.statut };
     match.date = newDate;
     match.statut = 'Programmé';
-    if (match.notes) {
-      match.notes = `${match.notes}\n[Reporté] ${reason}`;
-    } else {
-      match.notes = `[Reporté] ${reason}`;
-    }
+    match.notes = match.notes
+      ? `${match.notes}\n[Reporté] ${reason}`
+      : `[Reporté] ${reason}`;
     await match.save();
 
     await AuditService.log({

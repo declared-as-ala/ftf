@@ -1,0 +1,1202 @@
+[
+  {
+    "home": "EST",
+    "away": "JSO",
+    "outcome": 1
+  },
+  {
+    "home": "OB",
+    "away": "CA",
+    "outcome": 1
+  },
+  {
+    "home": "ST",
+    "away": "ASG",
+    "outcome": 1
+  },
+  {
+    "home": "JSK",
+    "away": "USM",
+    "outcome": -1
+  },
+  {
+    "home": "ESS",
+    "away": "USBG",
+    "outcome": 0
+  },
+  {
+    "home": "ASS",
+    "away": "CSS",
+    "outcome": -1
+  },
+  {
+    "home": "ESZ",
+    "away": "ESM",
+    "outcome": -1
+  },
+  {
+    "home": "ASM",
+    "away": "CAB",
+    "outcome": -1
+  },
+  {
+    "home": "OB",
+    "away": "EST",
+    "outcome": -1
+  },
+  {
+    "home": "JSO",
+    "away": "ASG",
+    "outcome": 1
+  },
+  {
+    "home": "JSK",
+    "away": "CA",
+    "outcome": -1
+  },
+  {
+    "home": "ST",
+    "away": "USBG",
+    "outcome": -1
+  },
+  {
+    "home": "ASS",
+    "away": "USM",
+    "outcome": -1
+  },
+  {
+    "home": "ESS",
+    "away": "ESM",
+    "outcome": -1
+  },
+  {
+    "home": "ASM",
+    "away": "CSS",
+    "outcome": 1
+  },
+  {
+    "home": "ESZ",
+    "away": "CAB",
+    "outcome": 0
+  },
+  {
+    "home": "EST",
+    "away": "ASG",
+    "outcome": 1
+  },
+  {
+    "home": "JSK",
+    "away": "OB",
+    "outcome": -1
+  },
+  {
+    "home": "JSO",
+    "away": "USBG",
+    "outcome": -1
+  },
+  {
+    "home": "ASS",
+    "away": "CA",
+    "outcome": -1
+  },
+  {
+    "home": "ST",
+    "away": "ESM",
+    "outcome": 0
+  },
+  {
+    "home": "ASM",
+    "away": "USM",
+    "outcome": -1
+  },
+  {
+    "home": "ESS",
+    "away": "CAB",
+    "outcome": -1
+  },
+  {
+    "home": "ESZ",
+    "away": "CSS",
+    "outcome": -1
+  },
+  {
+    "home": "JSK",
+    "away": "EST",
+    "outcome": -1
+  },
+  {
+    "home": "ASG",
+    "away": "USBG",
+    "outcome": 1
+  },
+  {
+    "home": "ASS",
+    "away": "OB",
+    "outcome": -1
+  },
+  {
+    "home": "JSO",
+    "away": "ESM",
+    "outcome": -1
+  },
+  {
+    "home": "ASM",
+    "away": "CA",
+    "outcome": -1
+  },
+  {
+    "home": "ST",
+    "away": "CAB",
+    "outcome": 1
+  },
+  {
+    "home": "ESZ",
+    "away": "USM",
+    "outcome": 0
+  },
+  {
+    "home": "ESS",
+    "away": "CSS",
+    "outcome": 1
+  },
+  {
+    "home": "EST",
+    "away": "USBG",
+    "outcome": 1
+  },
+  {
+    "home": "ASS",
+    "away": "JSK",
+    "outcome": 0
+  },
+  {
+    "home": "ASG",
+    "away": "ESM",
+    "outcome": 0
+  },
+  {
+    "home": "ASM",
+    "away": "OB",
+    "outcome": 0
+  },
+  {
+    "home": "JSO",
+    "away": "CAB",
+    "outcome": -1
+  },
+  {
+    "home": "ESZ",
+    "away": "CA",
+    "outcome": -1
+  },
+  {
+    "home": "ST",
+    "away": "CSS",
+    "outcome": -1
+  },
+  {
+    "home": "ESS",
+    "away": "USM",
+    "outcome": -1
+  },
+  {
+    "home": "ASS",
+    "away": "EST",
+    "outcome": -1
+  },
+  {
+    "home": "USBG",
+    "away": "ESM",
+    "outcome": -1
+  },
+  {
+    "home": "ASM",
+    "away": "JSK",
+    "outcome": -1
+  },
+  {
+    "home": "ASG",
+    "away": "CAB",
+    "outcome": 1
+  },
+  {
+    "home": "ESZ",
+    "away": "OB",
+    "outcome": 1
+  },
+  {
+    "home": "JSO",
+    "away": "CSS",
+    "outcome": -1
+  },
+  {
+    "home": "ESS",
+    "away": "CA",
+    "outcome": -1
+  },
+  {
+    "home": "ST",
+    "away": "USM",
+    "outcome": 0
+  },
+  {
+    "home": "EST",
+    "away": "ESM",
+    "outcome": 1
+  },
+  {
+    "home": "ASM",
+    "away": "ASS",
+    "outcome": 1
+  },
+  {
+    "home": "USBG",
+    "away": "CAB",
+    "outcome": 0
+  },
+  {
+    "home": "ESZ",
+    "away": "JSK",
+    "outcome": -1
+  },
+  {
+    "home": "ASG",
+    "away": "CSS",
+    "outcome": -1
+  },
+  {
+    "home": "ESS",
+    "away": "OB",
+    "outcome": -1
+  },
+  {
+    "home": "JSO",
+    "away": "USM",
+    "outcome": 0
+  },
+  {
+    "home": "ST",
+    "away": "CA",
+    "outcome": -1
+  },
+  {
+    "home": "ASM",
+    "away": "EST",
+    "outcome": -1
+  },
+  {
+    "home": "ESM",
+    "away": "CAB",
+    "outcome": 0
+  },
+  {
+    "home": "ESZ",
+    "away": "ASS",
+    "outcome": 0
+  },
+  {
+    "home": "USBG",
+    "away": "CSS",
+    "outcome": 1
+  },
+  {
+    "home": "ESS",
+    "away": "JSK",
+    "outcome": -1
+  },
+  {
+    "home": "ASG",
+    "away": "USM",
+    "outcome": 0
+  },
+  {
+    "home": "ST",
+    "away": "OB",
+    "outcome": 0
+  },
+  {
+    "home": "JSO",
+    "away": "CA",
+    "outcome": -1
+  },
+  {
+    "home": "EST",
+    "away": "CAB",
+    "outcome": 1
+  },
+  {
+    "home": "ESZ",
+    "away": "ASM",
+    "outcome": 0
+  },
+  {
+    "home": "ESM",
+    "away": "CSS",
+    "outcome": -1
+  },
+  {
+    "home": "ESS",
+    "away": "ASS",
+    "outcome": 0
+  },
+  {
+    "home": "USBG",
+    "away": "USM",
+    "outcome": -1
+  },
+  {
+    "home": "ST",
+    "away": "JSK",
+    "outcome": 1
+  },
+  {
+    "home": "ASG",
+    "away": "CA",
+    "outcome": -1
+  },
+  {
+    "home": "JSO",
+    "away": "OB",
+    "outcome": 1
+  },
+  {
+    "home": "ESZ",
+    "away": "EST",
+    "outcome": 1
+  },
+  {
+    "home": "CAB",
+    "away": "CSS",
+    "outcome": -1
+  },
+  {
+    "home": "ESS",
+    "away": "ASM",
+    "outcome": -1
+  },
+  {
+    "home": "ESM",
+    "away": "USM",
+    "outcome": -1
+  },
+  {
+    "home": "ST",
+    "away": "ASS",
+    "outcome": 0
+  },
+  {
+    "home": "USBG",
+    "away": "CA",
+    "outcome": 0
+  },
+  {
+    "home": "JSO",
+    "away": "JSK",
+    "outcome": 1
+  },
+  {
+    "home": "ASG",
+    "away": "OB",
+    "outcome": -1
+  },
+  {
+    "home": "EST",
+    "away": "CSS",
+    "outcome": 1
+  },
+  {
+    "home": "ESS",
+    "away": "ESZ",
+    "outcome": 0
+  },
+  {
+    "home": "CAB",
+    "away": "USM",
+    "outcome": -1
+  },
+  {
+    "home": "ST",
+    "away": "ASM",
+    "outcome": -1
+  },
+  {
+    "home": "ESM",
+    "away": "CA",
+    "outcome": 1
+  },
+  {
+    "home": "JSO",
+    "away": "ASS",
+    "outcome": 1
+  },
+  {
+    "home": "USBG",
+    "away": "OB",
+    "outcome": 0
+  },
+  {
+    "home": "ASG",
+    "away": "JSK",
+    "outcome": -1
+  },
+  {
+    "home": "ESS",
+    "away": "EST",
+    "outcome": 1
+  },
+  {
+    "home": "CSS",
+    "away": "USM",
+    "outcome": 0
+  },
+  {
+    "home": "ST",
+    "away": "ESZ",
+    "outcome": 1
+  },
+  {
+    "home": "CAB",
+    "away": "CA",
+    "outcome": -1
+  },
+  {
+    "home": "JSO",
+    "away": "ASM",
+    "outcome": 1
+  },
+  {
+    "home": "ESM",
+    "away": "OB",
+    "outcome": 1
+  },
+  {
+    "home": "ASG",
+    "away": "ASS",
+    "outcome": -1
+  },
+  {
+    "home": "USBG",
+    "away": "JSK",
+    "outcome": -1
+  },
+  {
+    "home": "EST",
+    "away": "USM",
+    "outcome": 0
+  },
+  {
+    "home": "ST",
+    "away": "ESS",
+    "outcome": 0
+  },
+  {
+    "home": "CSS",
+    "away": "CA",
+    "outcome": -1
+  },
+  {
+    "home": "JSO",
+    "away": "ESZ",
+    "outcome": -1
+  },
+  {
+    "home": "CAB",
+    "away": "OB",
+    "outcome": 0
+  },
+  {
+    "home": "ASG",
+    "away": "ASM",
+    "outcome": 0
+  },
+  {
+    "home": "ESM",
+    "away": "JSK",
+    "outcome": 1
+  },
+  {
+    "home": "USBG",
+    "away": "ASS",
+    "outcome": 1
+  },
+  {
+    "home": "ST",
+    "away": "EST",
+    "outcome": 1
+  },
+  {
+    "home": "USM",
+    "away": "CA",
+    "outcome": 0
+  },
+  {
+    "home": "JSO",
+    "away": "ESS",
+    "outcome": 1
+  },
+  {
+    "home": "CSS",
+    "away": "OB",
+    "outcome": 1
+  },
+  {
+    "home": "ASG",
+    "away": "ESZ",
+    "outcome": -1
+  },
+  {
+    "home": "CAB",
+    "away": "JSK",
+    "outcome": -1
+  },
+  {
+    "home": "USBG",
+    "away": "ASM",
+    "outcome": 1
+  },
+  {
+    "home": "ESM",
+    "away": "ASS",
+    "outcome": -1
+  },
+  {
+    "home": "EST",
+    "away": "CA",
+    "outcome": -1
+  },
+  {
+    "home": "JSO",
+    "away": "ST",
+    "outcome": -1
+  },
+  {
+    "home": "USM",
+    "away": "OB",
+    "outcome": 0
+  },
+  {
+    "home": "ASG",
+    "away": "ESS",
+    "outcome": -1
+  },
+  {
+    "home": "CSS",
+    "away": "JSK",
+    "outcome": 1
+  },
+  {
+    "home": "USBG",
+    "away": "ESZ",
+    "outcome": -1
+  },
+  {
+    "home": "CAB",
+    "away": "ASS",
+    "outcome": 1
+  },
+  {
+    "home": "ESM",
+    "away": "ASM",
+    "outcome": 0
+  },
+  {
+    "home": "JSO",
+    "away": "EST",
+    "outcome": -1
+  },
+  {
+    "home": "CA",
+    "away": "OB",
+    "outcome": 1
+  },
+  {
+    "home": "ASG",
+    "away": "ST",
+    "outcome": -1
+  },
+  {
+    "home": "USM",
+    "away": "JSK",
+    "outcome": -1
+  },
+  {
+    "home": "USBG",
+    "away": "ESS",
+    "outcome": 0
+  },
+  {
+    "home": "CSS",
+    "away": "ASS",
+    "outcome": 1
+  },
+  {
+    "home": "ESM",
+    "away": "ESZ",
+    "outcome": -1
+  },
+  {
+    "home": "CAB",
+    "away": "ASM",
+    "outcome": 0
+  },
+  {
+    "home": "EST",
+    "away": "OB",
+    "outcome": 1
+  },
+  {
+    "home": "ASG",
+    "away": "JSO",
+    "outcome": -1
+  },
+  {
+    "home": "CA",
+    "away": "JSK",
+    "outcome": 0
+  },
+  {
+    "home": "USBG",
+    "away": "ST",
+    "outcome": -1
+  },
+  {
+    "home": "USM",
+    "away": "ASS",
+    "outcome": 1
+  },
+  {
+    "home": "ESM",
+    "away": "ESS",
+    "outcome": -1
+  },
+  {
+    "home": "CSS",
+    "away": "ASM",
+    "outcome": 1
+  },
+  {
+    "home": "CAB",
+    "away": "ESZ",
+    "outcome": -1
+  },
+  {
+    "home": "ASG",
+    "away": "EST",
+    "outcome": -1
+  },
+  {
+    "home": "OB",
+    "away": "JSK",
+    "outcome": -1
+  },
+  {
+    "home": "USBG",
+    "away": "JSO",
+    "outcome": -1
+  },
+  {
+    "home": "CA",
+    "away": "ASS",
+    "outcome": 0
+  },
+  {
+    "home": "ESM",
+    "away": "ST",
+    "outcome": 0
+  },
+  {
+    "home": "USM",
+    "away": "ASM",
+    "outcome": -1
+  },
+  {
+    "home": "CAB",
+    "away": "ESS",
+    "outcome": -1
+  },
+  {
+    "home": "CSS",
+    "away": "ESZ",
+    "outcome": 0
+  },
+  {
+    "home": "EST",
+    "away": "JSK",
+    "outcome": 1
+  },
+  {
+    "home": "USBG",
+    "away": "ASG",
+    "outcome": 0
+  },
+  {
+    "home": "OB",
+    "away": "ASS",
+    "outcome": 1
+  },
+  {
+    "home": "ESM",
+    "away": "JSO",
+    "outcome": 0
+  },
+  {
+    "home": "CA",
+    "away": "ASM",
+    "outcome": 1
+  },
+  {
+    "home": "CAB",
+    "away": "ST",
+    "outcome": 0
+  },
+  {
+    "home": "USM",
+    "away": "ESZ",
+    "outcome": -1
+  },
+  {
+    "home": "CSS",
+    "away": "ESS",
+    "outcome": 1
+  },
+  {
+    "home": "USBG",
+    "away": "EST",
+    "outcome": 1
+  },
+  {
+    "home": "JSK",
+    "away": "ASS",
+    "outcome": 0
+  },
+  {
+    "home": "ESM",
+    "away": "ASG",
+    "outcome": 1
+  },
+  {
+    "home": "OB",
+    "away": "ASM",
+    "outcome": -1
+  },
+  {
+    "home": "CAB",
+    "away": "JSO",
+    "outcome": 1
+  },
+  {
+    "home": "CA",
+    "away": "ESZ",
+    "outcome": -1
+  },
+  {
+    "home": "CSS",
+    "away": "ST",
+    "outcome": -1
+  },
+  {
+    "home": "USM",
+    "away": "ESS",
+    "outcome": -1
+  },
+  {
+    "home": "EST",
+    "away": "ASS",
+    "outcome": 0
+  },
+  {
+    "home": "ESM",
+    "away": "USBG",
+    "outcome": 0
+  },
+  {
+    "home": "JSK",
+    "away": "ASM",
+    "outcome": -1
+  },
+  {
+    "home": "CAB",
+    "away": "ASG",
+    "outcome": 1
+  },
+  {
+    "home": "OB",
+    "away": "ESZ",
+    "outcome": 0
+  },
+  {
+    "home": "CSS",
+    "away": "JSO",
+    "outcome": 1
+  },
+  {
+    "home": "CA",
+    "away": "ESS",
+    "outcome": 1
+  },
+  {
+    "home": "USM",
+    "away": "ST",
+    "outcome": 0
+  },
+  {
+    "home": "ESM",
+    "away": "EST",
+    "outcome": 1
+  },
+  {
+    "home": "ASS",
+    "away": "ASM",
+    "outcome": 0
+  },
+  {
+    "home": "CAB",
+    "away": "USBG",
+    "outcome": 0
+  },
+  {
+    "home": "JSK",
+    "away": "ESZ",
+    "outcome": -1
+  },
+  {
+    "home": "CSS",
+    "away": "ASG",
+    "outcome": 1
+  },
+  {
+    "home": "OB",
+    "away": "ESS",
+    "outcome": -1
+  },
+  {
+    "home": "USM",
+    "away": "JSO",
+    "outcome": 0
+  },
+  {
+    "home": "CA",
+    "away": "ST",
+    "outcome": 1
+  },
+  {
+    "home": "EST",
+    "away": "ASM",
+    "outcome": 1
+  },
+  {
+    "home": "CAB",
+    "away": "ESM",
+    "outcome": 1
+  },
+  {
+    "home": "ASS",
+    "away": "ESZ",
+    "outcome": 1
+  },
+  {
+    "home": "CSS",
+    "away": "USBG",
+    "outcome": 1
+  },
+  {
+    "home": "JSK",
+    "away": "ESS",
+    "outcome": -1
+  },
+  {
+    "home": "USM",
+    "away": "ASG",
+    "outcome": 1
+  },
+  {
+    "home": "OB",
+    "away": "ST",
+    "outcome": -1
+  },
+  {
+    "home": "CA",
+    "away": "JSO",
+    "outcome": 1
+  },
+  {
+    "home": "CAB",
+    "away": "EST",
+    "outcome": -1
+  },
+  {
+    "home": "ASM",
+    "away": "ESZ",
+    "outcome": 0
+  },
+  {
+    "home": "CSS",
+    "away": "ESM",
+    "outcome": 1
+  },
+  {
+    "home": "ASS",
+    "away": "ESS",
+    "outcome": 0
+  },
+  {
+    "home": "USM",
+    "away": "USBG",
+    "outcome": 0
+  },
+  {
+    "home": "JSK",
+    "away": "ST",
+    "outcome": -1
+  },
+  {
+    "home": "CA",
+    "away": "ASG",
+    "outcome": 1
+  },
+  {
+    "home": "OB",
+    "away": "JSO",
+    "outcome": 0
+  },
+  {
+    "home": "EST",
+    "away": "ESZ",
+    "outcome": 1
+  },
+  {
+    "home": "CSS",
+    "away": "CAB",
+    "outcome": 1
+  },
+  {
+    "home": "ASM",
+    "away": "ESS",
+    "outcome": 0
+  },
+  {
+    "home": "USM",
+    "away": "ESM",
+    "outcome": 1
+  },
+  {
+    "home": "ASS",
+    "away": "ST",
+    "outcome": 0
+  },
+  {
+    "home": "CA",
+    "away": "USBG",
+    "outcome": 1
+  },
+  {
+    "home": "JSK",
+    "away": "JSO",
+    "outcome": -1
+  },
+  {
+    "home": "OB",
+    "away": "ASG",
+    "outcome": 1
+  },
+  {
+    "home": "CSS",
+    "away": "EST",
+    "outcome": -1
+  },
+  {
+    "home": "ESZ",
+    "away": "ESS",
+    "outcome": -1
+  },
+  {
+    "home": "USM",
+    "away": "CAB",
+    "outcome": 1
+  },
+  {
+    "home": "ASM",
+    "away": "ST",
+    "outcome": 0
+  },
+  {
+    "home": "CA",
+    "away": "ESM",
+    "outcome": -1
+  },
+  {
+    "home": "ASS",
+    "away": "JSO",
+    "outcome": 1
+  },
+  {
+    "home": "OB",
+    "away": "USBG",
+    "outcome": 0
+  },
+  {
+    "home": "JSK",
+    "away": "ASG",
+    "outcome": -1
+  },
+  {
+    "home": "EST",
+    "away": "ESS",
+    "outcome": 1
+  },
+  {
+    "home": "USM",
+    "away": "CSS",
+    "outcome": -1
+  },
+  {
+    "home": "ESZ",
+    "away": "ST",
+    "outcome": 0
+  },
+  {
+    "home": "CA",
+    "away": "CAB",
+    "outcome": 0
+  },
+  {
+    "home": "ASM",
+    "away": "JSO",
+    "outcome": 0
+  },
+  {
+    "home": "OB",
+    "away": "ESM",
+    "outcome": 0
+  },
+  {
+    "home": "ASS",
+    "away": "ASG",
+    "outcome": 0
+  },
+  {
+    "home": "JSK",
+    "away": "USBG",
+    "outcome": 1
+  },
+  {
+    "home": "USM",
+    "away": "EST",
+    "outcome": -1
+  },
+  {
+    "home": "ESS",
+    "away": "ST",
+    "outcome": 0
+  },
+  {
+    "home": "CA",
+    "away": "CSS",
+    "outcome": 1
+  },
+  {
+    "home": "ESZ",
+    "away": "JSO",
+    "outcome": 0
+  },
+  {
+    "home": "OB",
+    "away": "CAB",
+    "outcome": 0
+  },
+  {
+    "home": "ASM",
+    "away": "ASG",
+    "outcome": -1
+  },
+  {
+    "home": "JSK",
+    "away": "ESM",
+    "outcome": 0
+  },
+  {
+    "home": "ASS",
+    "away": "USBG",
+    "outcome": -1
+  },
+  {
+    "home": "EST",
+    "away": "ST",
+    "outcome": -1
+  },
+  {
+    "home": "CA",
+    "away": "USM",
+    "outcome": 1
+  },
+  {
+    "home": "ESS",
+    "away": "JSO",
+    "outcome": 1
+  },
+  {
+    "home": "OB",
+    "away": "CSS",
+    "outcome": -1
+  },
+  {
+    "home": "ESZ",
+    "away": "ASG",
+    "outcome": 0
+  },
+  {
+    "home": "JSK",
+    "away": "CAB",
+    "outcome": -1
+  },
+  {
+    "home": "ASM",
+    "away": "USBG",
+    "outcome": 0
+  },
+  {
+    "home": "ASS",
+    "away": "ESM",
+    "outcome": 0
+  },
+  {
+    "home": "CA",
+    "away": "EST",
+    "outcome": 0
+  },
+  {
+    "home": "ST",
+    "away": "JSO",
+    "outcome": -1
+  },
+  {
+    "home": "OB",
+    "away": "USM",
+    "outcome": 0
+  },
+  {
+    "home": "ESS",
+    "away": "ASG",
+    "outcome": 1
+  },
+  {
+    "home": "JSK",
+    "away": "CSS",
+    "outcome": -1
+  },
+  {
+    "home": "ESZ",
+    "away": "USBG",
+    "outcome": -1
+  },
+  {
+    "home": "ASS",
+    "away": "CAB",
+    "outcome": 1
+  },
+  {
+    "home": "ASM",
+    "away": "ESM",
+    "outcome": 1
+  }
+]

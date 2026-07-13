@@ -4,15 +4,17 @@
   </defs>
   <path d="M60 6 L112 24 V72 C112 106 91 126 60 134 C29 126 8 106 8 72 V24 Z" fill="#1857a4"/>
   <g clip-path="url(#shield)">
-    <rect x="60" y="0" width="60" height="140" fill="#f5f5f2"/>
-    <rect x="0" y="76" width="120" height="30" fill="#101828"/>
-    <circle cx="60" cy="44" r="17" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="3"/>
-    <path d="M60 27 v34 M43 44 h34" stroke="rgba(255,255,255,0.85)" stroke-width="3"/>
+    
+        <rect x="0" y="0" width="60" height="140" fill="#1857a4"/>
+        <rect x="60" y="0" width="60" height="140" fill="#f5f5f2"/>
+        <path d="M 60 35 A 15 15 0 0 0 60 65 A 12 12 0 0 1 65 37" fill="#f5f5f2"/>
+      
+    <rect x="0" y="80" width="120" height="26" fill="#101828"/>
   </g>
-  <text x="60" y="98" text-anchor="middle" dominant-baseline="middle"
+  <text x="60" y="93" text-anchor="middle" dominant-baseline="middle"
         font-family="Arial, Helvetica, sans-serif" font-weight="bold"
         font-size="26" fill="#ffffff" letter-spacing="1">JSO</text>
   <path d="M60 6 L112 24 V72 C112 106 91 126 60 134 C29 126 8 106 8 72 V24 Z" fill="none" stroke="rgba(16,24,40,0.9)" stroke-width="3"/>
   <path d="M60 12 L106 28 V71 C106 101 88 119 60 127 C32 119 14 101 14 71 V28 Z"
-        fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
+        fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
 </svg>

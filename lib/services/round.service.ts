@@ -9,10 +9,16 @@ export class RoundService {
    * ou portent un statut d'annulation/report explicite (§5.9 de la spécification).
    * Si oui, met à jour le statut du Round en 'COMPLETED'. Sinon, le remet en 'ACTIVE'.
    */
-  static async checkRoundCompletion(roundId: string | mongoose.Types.ObjectId): Promise<boolean> {
+  static async checkRoundCompletion(
+    roundId: string | mongoose.Types.ObjectId,
+    organizationId?: string | mongoose.Types.ObjectId
+  ): Promise<boolean> {
     await connectDB();
     
-    const matches = await Match.find({ roundId });
+    const matches = await Match.find({
+      roundId,
+      ...(organizationId ? { organizationId } : {}),
+    });
     if (matches.length === 0) {
       return false;
     }
@@ -23,7 +29,10 @@ export class RoundService {
       (m) => m.homologue === true || ['Reporté', 'Annulé'].includes(m.statut)
     );
 
-    const round = await Round.findById(roundId);
+    const round = await Round.findOne({
+      _id: roundId,
+      ...(organizationId ? { organizationId } : {}),
+    });
     if (round) {
       const newStatus = isCompleted ? 'COMPLETED' : 'ACTIVE';
       if (round.status !== newStatus) {

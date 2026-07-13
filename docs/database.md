@@ -19,11 +19,13 @@
 | — | `DisciplinaryRuleSet` | **New**, versioned |
 | — | `Suspension` | **New** — supersedes `Discipline` for player suspensions |
 | — | `SuspensionServiceEntry` | **New** — the serving ledger |
-| — | `Notification` | **New** |
+| `Notification.ts` | `Notification` (extended) | Separate immutable content/intent from per-club delivery/read state; preserve automatic dedupe behavior |
+| — | `NotificationRecipient` | **New** — one delivery/read row per notification and club |
 | — | `AuditLog` | **New**, immutable |
 | — | `Standings` | **New** — snapshot collection, rebuildable |
 | `Discipline.ts` | frozen | Kept for history reference; new engine writes to Suspension/DisciplinaryCard |
-| `Arbitre.ts` | kept (fix TS bug) | Basic CRUD stays; no referee portal |
+| `Arbitre.ts` | `Arbitre` (extended) | Adapt in place for the approved administrative registry; no referee user or portal |
+| — | `MatchOfficialAssignment` | **New** versioned assignment collection; separate from `Match` for publication history, conflicts, reporting, and auditability |
 | `Staff.ts`, `Evenement.ts`, `Licence.ts`, `Transfert.ts` | frozen future modules | `@deprecated`/`future-module` header comments only |
 
 ## 2. Target interfaces
@@ -132,11 +134,15 @@ interface Round {
 interface Match {
   organizationId: ObjectId; seasonId: ObjectId; competitionId: ObjectId; roundId: ObjectId;
   homeClubId: ObjectId; awayClubId: ObjectId;   // must differ; both must belong to competition
-  scheduledAt: Date; venue?: string;
+  scheduledAt: Date; venue?: string; venueCity?: string;
   status: "DRAFT" | "SCHEDULED" | "POSTPONED" | "IN_PROGRESS"
         | "PLAYED_PENDING_VALIDATION" | "OFFICIAL" | "ABANDONED"
         | "CANCELLED" | "FORFEIT" | "REPLAY_ORDERED";
   homeScore?: number; awayScore?: number;       // required to finalize a played match
+  scoreOverride?: {
+    reasonCode: "FORFEIT" | "ADMINISTRATIVE_DECISION" | "LEGACY_IMPORT";
+    explanation: string; authorizedBy: ObjectId; authorizedAt: Date;
+  };
   forfeitWinnerClubId?: ObjectId; forfeitCauseClubId?: ObjectId;
   isOfficial: boolean;
   finalizedAt?: Date; finalizedBy?: ObjectId;
@@ -157,14 +163,20 @@ interface MatchEvent {
   type: "GOAL" | "OWN_GOAL" | "PENALTY_GOAL" | "PENALTY_MISSED"
       | "YELLOW_CARD" | "SECOND_YELLOW_RED" | "DIRECT_RED";
   minute?: number; stoppageMinute?: number;
-  assistPlayerId?: ObjectId; cardReason?: string; notes?: string;
+  assistPlayerId?: ObjectId; cardReason?: string; reportReference?: string; notes?: string;
   status: "DRAFT" | "CONFIRMED" | "CANCELLED";
+  clientMutationId: string; // unique per match; retry/idempotency identity
   createdBy: ObjectId; createdAt: Date; updatedAt: Date;
+  cancelledAt?: Date; cancelledBy?: ObjectId; cancellationReason?: string;
 }
 // Rules: player must belong to clubId at match date; club must participate;
 // own goals credit the opponent's score; event totals validated vs final score;
 // post-finalization changes require reopen/correction workflow.
+// unique: (matchId, clientMutationId). A same-player/same-minute heuristic may warn,
+// but cannot be a hard unique key because two legitimate events can share a minute.
 ```
+
+`MatchEvent` is a planned canonical model; it does not exist in the current repository. `scripts/migrations/005-events.ts` operates on the unrelated legacy `Evenement` incident collection and explicitly leaves `Match.evenements` embedded. A new additive migration must backfill stable event IDs without deleting the embedded source until reconciliation proves parity.
 
 ### DisciplinaryCard
 ```ts
@@ -238,21 +250,47 @@ interface SuspensionServiceEntry {
 // UNIQUE INDEX: (suspensionId, matchId) — a match can never be counted twice.
 ```
 
-### Notification
+### Notification and NotificationRecipient
+
+Use one content/intent `Notification` plus one `NotificationRecipient` per addressed club. This avoids duplicating a 5000-character message for every broadcast, keeps sent content immutable, and supports accurate delivery/read statistics. Read state never lives on the parent notification.
+
 ```ts
 interface Notification {
   organizationId: ObjectId;
-  recipientUserId?: ObjectId; recipientClubId?: ObjectId;
-  type: "NEW_CARD" | "SECOND_YELLOW_WARNING" | "YELLOW_THRESHOLD_REACHED"
-      | "RED_CARD_PROVISIONAL_SUSPENSION" | "SUSPENSION_CONFIRMED" | "SUSPENSION_UPDATED"
-      | "SUSPENSION_SERVED" | "MATCH_RESCHEDULED" | "MATCH_RESULT_PUBLISHED";
-  title: string; message: string;
+  source: "SYSTEM" | "MANUAL";
+  type?: NotificationType;       // automatic event type
+  category: "GENERAL_ANNOUNCEMENT" | "COMPETITION" | "MATCH" | "DISCIPLINE"
+          | "ADMINISTRATIVE" | "DOCUMENT_REQUEST" | "MEETING" | "SYSTEM";
+  priority: "NORMAL" | "IMPORTANT" | "URGENT";
+  title: string;                 // 3..150, plain text
+  message: string;               // 3..5000, plain text; preserve line breaks
+  actionLabel?: string;
+  actionUrl?: string;            // validated allowlisted internal /club path only
+  targetType: "ADMIN_ONLY" | "ALL_ACTIVE_CLUBS" | "SINGLE_CLUB" | "MULTIPLE_CLUBS";
+  createdBy?: ObjectId;          // required for MANUAL; absent for service actor
+  sentAt: Date;
+  expiresAt?: Date;
   relatedEntityType?: string; relatedEntityId?: ObjectId;
-  dedupeKey?: string;          // prevents duplicates on finalization retry
+  status: "SENT" | "ARCHIVED";
+  dedupeKey?: string;            // SYSTEM retry protection, unique per organization
+  idempotencyKey?: string;       // MANUAL POST retry protection, unique per organization
+  duplicatedFromId?: ObjectId;
+  createdAt: Date; updatedAt: Date;
+}
+
+interface NotificationRecipient {
+  organizationId: ObjectId;
+  notificationId: ObjectId;
+  clubId: ObjectId;
+  deliveredAt: Date;
   readAt?: Date;
-  createdAt: Date;
+  readBy?: ObjectId;
+  archivedAt?: Date;             // optional club-side future use; no delete
+  createdAt: Date; updatedAt: Date;
 }
 ```
+
+`ADMIN_ONLY` preserves current internal automatic notifications and is never accepted by the manual composer. Archiving the parent is an admin-history state, not delivery retraction. Expiration affects active highlighting/query flags but never deletes either record.
 
 ### AuditLog (immutable — no update/delete API ever)
 ```ts
@@ -284,6 +322,52 @@ interface Standings {
 }
 ```
 
+### Arbitre (adapt existing French model)
+
+```ts
+interface Arbitre {
+  organizationId: ObjectId;
+  nom: string; prenom: string; displayName: string;
+  refereeCode?: string; licenceNumber?: string;
+  categorie: "ELITE" | "NATIONAL" | "REGIONAL";
+  ville?: string; region?: string;
+  status: "ACTIVE" | "UNAVAILABLE" | "SUSPENDED" | "INACTIVE" | "ARCHIVED";
+  notes?: string;                 // FTF_ADMIN only
+  photo?: string;                 // optional legacy support; never required
+  createdAt: Date; updatedAt: Date;
+}
+```
+
+`matchesArbitres` and `statistiques.matchesArbitres` are legacy denormalized fields and must not remain authoritative. Assignment counts and history come from `MatchOfficialAssignment`. Existing date-of-birth, nationality, certification, evaluation, contact, and suspension fields may remain for backward compatibility but are excluded from club DTOs.
+
+### MatchOfficialAssignment (versioned)
+
+Use a separate collection rather than embedding the workflow in `Match`: published changes need immutable versions, reporting and conflict queries need role indexes, and club visibility needs an explicit publication boundary.
+
+```ts
+interface MatchOfficialAssignment {
+  organizationId: ObjectId;
+  matchId: ObjectId; competitionId: ObjectId; roundId: ObjectId;
+  version: number;
+  status: "DRAFT" | "PUBLISHED" | "UPDATED" | "CANCELLED";
+  mainRefereeId?: ObjectId;
+  assistantReferee1Id?: ObjectId;
+  assistantReferee2Id?: ObjectId;
+  fourthOfficialId?: ObjectId;
+  assignedAt: Date; assignedBy: ObjectId;
+  publishedAt?: Date; publishedBy?: ObjectId;
+  cancelledAt?: Date; cancelledBy?: ObjectId;
+  changeReason?: string;          // required after first publication; admin only
+  notes?: string;                 // admin only
+  createdAt: Date; updatedAt: Date;
+}
+```
+
+- Unique `(organizationId, matchId, version)`; service logic and transactional compare-and-swap select at most one current draft/published version.
+- Index each official role for conflict lookup. Exact overlap is a hard conflict; an explicit configurable turnaround window is evaluated before publication.
+- `Match.arbitrePrincipalId` and `Match.assistants` become read-only legacy compatibility fields during migration, then stop driving API responses.
+- Published versions are immutable. Editing a published assignment creates version `n + 1`; cancellation preserves every prior version.
+
 ## 3. Index checklist
 
 | Collection | Index | Type |
@@ -299,9 +383,12 @@ interface Standings {
 | disciplinarycards | (playerId, seasonId, accumulationStatus) | query |
 | suspensions | (playerId, status) / (clubId, status) | query |
 | suspensionserviceentries | **(suspensionId, matchId)** | **unique** |
-| notifications | (recipientClubId, readAt) / (dedupeKey) | query / unique-sparse |
+| notifications | (organizationId, source, status, sentAt) / (organizationId, dedupeKey) / (organizationId, idempotencyKey) | query / unique-sparse / unique-sparse |
+| notificationrecipients | **(notificationId, clubId)** / (organizationId, clubId, readAt, deliveredAt) | **unique** / query |
 | auditlogs | (entityType, entityId) / (actorUserId, createdAt) | query |
 | disciplinaryrulesets | (organizationId, seasonId, competitionId, version) | unique |
+| arbitres | (organizationId, status, categorie, ville, region) / (organizationId, refereeCode) / (organizationId, licenceNumber) | query / unique-sparse |
+| matchofficialassignments | **(organizationId, matchId, version)** / role conflict indexes / (matchId, status, version) | **unique** / query |
 
 ## 4. Staged `organizationId` migration (spec §7)
 
@@ -320,9 +407,24 @@ interface Standings {
 | `004-match-status.ts` | Map legacy French statuses to new enum (mapping in Match section above); set `isOfficial: true`, `processingVersion: 0` |
 | `005-events.ts` | Copy embedded `Match.evenements[]` into `MatchEvent` collection (status CONFIRMED for homologated matches, DRAFT otherwise); embedded array becomes read-only legacy |
 | `006-rulesets.ts` | Create v1 `DisciplinaryRuleSet` per season from `Saison.configuration` |
+| `007-referee-registry.ts` (planned) | Backfill organization, display name, canonical category/status and codes; make photo optional; preserve legacy fields |
+| `008-match-official-assignments.ts` (planned) | Convert existing `Match.arbitrePrincipalId`/`assistants` to version-1 assignments; keep them draft unless an explicit trustworthy publication state exists |
+| `009-notification-recipients.ts` (planned) | Normalize legacy notification content and create per-club recipient/read rows without losing IDs, dedupe keys, read state, or admin-only notifications |
 
 Every migration: idempotent (safe to re-run), logs a summary, never deletes source data.
+
+Migration `007` maps `Élite → ELITE`, `Régional → REGIONAL`, and both legacy division categories to `NATIONAL` while preserving the original value in migration metadata/legacy storage; `actif: true/false` maps to `ACTIVE/INACTIVE`. It reports duplicate codes/licences for manual resolution and does not delete valid stored photos. The exact broken default `/placeholder-arbitre.png` may be unset because the UI fallback is the local Lucide icon.
+
+For safety, migration `008` must not infer club visibility from the mere presence of a legacy referee ID. Legacy rows have no publication evidence, so they remain `DRAFT` until an FTF administrator reviews and publishes them.
+
+Migration `009` converts `subject/body → title/message`, defaults legacy records to `source: SYSTEM`, `priority: NORMAL`, `status: SENT`, and maps categories from the existing automatic type. Each legacy `recipientClubId` becomes one `NotificationRecipient`; `read/readAt` moves to that row. Records without a club remain `ADMIN_ONLY`. Legacy recipient/read fields stay read-only during a compatibility window, then are removed only after count and read-state reconciliation succeeds.
 
 ## 6. Data-integrity rules
 
 MongoDB **transactions** for finalization/reopen (requires replica set — see [security.md](security.md) & compose changes) · optimistic concurrency via `processingVersion` · unique indexes above · stable event identifiers (`sourceEventId`) · soft archival over deletion · immutable audit logs · rule versioning · deterministic rebuild functions (standings, accumulation, serving) from authoritative events.
+
+Required workspace indexes: unique `match_events(matchId, clientMutationId)`; `match_events(matchId, status, minute, stoppageMinute)`; unique sparse `disciplinary_cards(sourceEventId)`; existing unique `suspension_service_entries(suspensionId, matchId)`; and an organization/status/date lookup for reviewable anomalies. Creating a ledger row and decrementing a suspension must share one transaction.
+
+Do not persist a second `MatchDisciplineImpact` summary. Build that read projection from canonical match events, disciplinary cards, suspensions, serving entries, anomalies, notification deliveries, and audit records. If anomaly review must retain resolution state, add `DisciplinaryAnomaly` with organization/match/player/source-event/type, evidence, `OPEN|CONFIRMED|DISMISSED|RESOLVED`, resolution reason/actor/time, and an organization-scoped unique source key.
+
+Current implementation warning: `DisciplinaryCard` has no `sourceEventId` constraint, the embedded events have no stable idempotency identity, and red provisional suspensions use a one-match placeholder required by the current schema. These are migration inputs, not behavior to preserve.

@@ -10,8 +10,7 @@ import type { IEvenementMatch } from '../models/Match';
  *  - Carton Jaune → YellowCardAccumulationService.processYellow()
  *  - Carton Rouge / Carton Jaune Rouge → YellowCardAccumulationService.processRedCard()
  *
- * Serving (SuspensionService.processServingForMatch) runs AFTER commit —
- * it is post-transaction to avoid holding the session open too long.
+ * Serving is orchestrated by MatchFinalizationService in the same transaction.
  */
 export class DisciplineEngine {
   static async processMatchCards(
@@ -24,23 +23,48 @@ export class DisciplineEngine {
       isOfficial: boolean;
       homeClubId: any;
       awayClubId: any;
+      date?: Date;
       evenements: IEvenementMatch[];
     },
     session: mongoose.ClientSession
   ) {
-    // Fetch the disciplinary rule set — prefer the season-specific one,
-    // fall back to the most recent active rule set for the organization
+    const effectiveAt = match.date ?? new Date();
+    const effectiveFilter = {
+      effectiveFrom: { $lte: effectiveAt },
+      $or: [
+        { effectiveTo: { $exists: false } },
+        { effectiveTo: null },
+        { effectiveTo: { $gte: effectiveAt } },
+      ],
+    };
+
+    // Prefer an effective competition rule, then its season rule, then the
+    // organization fallback. Historical selection never crosses organizations.
     const ruleSet =
       (await DisciplinaryRuleSet.findOne({
         organizationId: match.organizationId,
         seasonId: match.saisonId,
+        competitionId: match.competitionId,
         active: true,
+        ...effectiveFilter,
       })
         .sort({ version: -1 })
         .session(session)
         .lean()) ||
       (await DisciplinaryRuleSet.findOne({
         organizationId: match.organizationId,
+        seasonId: match.saisonId,
+        competitionId: { $exists: false },
+        active: true,
+        ...effectiveFilter,
+      })
+        .sort({ version: -1 })
+        .session(session)
+        .lean()) ||
+      (await DisciplinaryRuleSet.findOne({
+        organizationId: match.organizationId,
+        active: true,
+        ...effectiveFilter,
       })
         .sort({ version: -1 })
         .session(session)

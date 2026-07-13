@@ -567,7 +567,8 @@ describe('EligibilityService', () => {
       clubId.toString(),
       new mongoose.Types.ObjectId().toString(),
       saisonId.toString(),
-      3
+      3,
+      orgId.toString()
     );
 
     const homePlayer = eligibility.home.find(p => p.player._id === playerId.toString());
@@ -606,7 +607,8 @@ describe('EligibilityService', () => {
       clubId.toString(),
       new mongoose.Types.ObjectId().toString(),
       saisonId.toString(),
-      3
+      3,
+      orgId.toString()
     );
 
     const homePlayer = eligibility.home.find(p => p.player._id === playerId.toString());

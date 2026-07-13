@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin, apiError } from '@/lib/api';
-import MatchCorrectionService from '@/lib/services/match-correction.service';
+import MatchCorrectionService, {
+  MatchCorrectionRebuildRequiredError,
+} from '@/lib/services/match-correction.service';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
@@ -32,6 +34,9 @@ export async function POST(
 
     return NextResponse.json(match);
   } catch (error) {
+    if (error instanceof MatchCorrectionRebuildRequiredError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     return apiError(error, `POST /api/admin/matches/${(await params).id}/reopen`);
   }
 }

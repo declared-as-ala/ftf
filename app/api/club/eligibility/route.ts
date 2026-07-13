@@ -10,14 +10,18 @@ export const runtime = 'nodejs';
 
 export async function GET(req: Request) {
   try {
-    const { clubId } = await requireClub();
+    const { session, clubId } = await requireClub();
+    const organizationId = session.user.organizationId;
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Organisation non configurée' }, { status: 400 });
+    }
     await connectDB();
 
     const { searchParams } = new URL(req.url);
     const matchId = searchParams.get('matchId');
 
     if (matchId) {
-      const match = await Match.findById(matchId).lean();
+      const match = await Match.findOne({ _id: matchId, organizationId }).lean();
       if (!match) {
         return NextResponse.json({ error: 'Match introuvable' }, { status: 404 });
       }
@@ -29,10 +33,16 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
       }
 
-      const competition = await Competition.findById(match.competitionId).lean();
+      const competition = await Competition.findOne({
+        _id: match.competitionId,
+        organizationId,
+      }).lean();
       let yellowThreshold = 3;
       if (competition?.disciplinaryRuleSetId) {
-        const ruleSet = await DisciplinaryRuleSet.findById(competition.disciplinaryRuleSetId).lean();
+        const ruleSet = await DisciplinaryRuleSet.findOne({
+          _id: competition.disciplinaryRuleSetId,
+          organizationId,
+        }).lean();
         if (ruleSet) yellowThreshold = ruleSet.yellowCardThreshold;
       }
 
@@ -41,7 +51,8 @@ export async function GET(req: Request) {
         match.homeClubId.toString(),
         match.awayClubId.toString(),
         match.saisonId.toString(),
-        yellowThreshold
+        yellowThreshold,
+        organizationId
       );
 
       return NextResponse.json({
@@ -53,6 +64,7 @@ export async function GET(req: Request) {
     }
 
     const upcomingMatches = await Match.find({
+      organizationId,
       $or: [{ homeClubId: clubId }, { awayClubId: clubId }],
       statut: { $in: ['Programmé', 'En Cours'] },
     })

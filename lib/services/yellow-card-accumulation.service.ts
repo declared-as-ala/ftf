@@ -1,8 +1,6 @@
 import mongoose from 'mongoose';
 import DisciplinaryCard from '../models/DisciplinaryCard';
 import Suspension from '../models/Suspension';
-import DisciplinaryRuleSet from '../models/DisciplinaryRuleSet';
-import Match from '../models/Match';
 import { NotificationService } from './notification.service';
 
 /**
@@ -57,6 +55,7 @@ export class YellowCardAccumulationService {
   ) {
     // Count current ACTIVE yellows for this player in this season (official matches only)
     const activeCount = await DisciplinaryCard.countDocuments({
+      organizationId,
       joueurId,
       saisonId,
       cardType: 'YELLOW',
@@ -93,6 +92,7 @@ export class YellowCardAccumulationService {
     if (matchIsOfficial && newCount >= ruleSetThreshold && newCount % ruleSetThreshold === 0) {
       // Find all ACTIVE yellows for this player in this season (including this one)
       const activeCards = await DisciplinaryCard.find({
+        organizationId,
         joueurId,
         saisonId,
         cardType: 'YELLOW',
@@ -141,23 +141,19 @@ export class YellowCardAccumulationService {
         { session }
       );
 
-      // Notify club (best-effort; failure logged, never throws)
-      setImmediate(async () => {
-        try {
-          await NotificationService.notify({
-            organizationId: organizationId.toString(),
-            recipientClubId: clubId.toString(),
-            type: 'SUSPENSION_CREATED',
-            subject: 'Suspension automatique — accumulation de cartons jaunes',
-            body: `Un joueur a atteint le seuil de ${ruleSetThreshold} cartons jaunes. Une suspension de ${ruleSetSuspensionMatches} match(s) a été créée automatiquement.`,
-            dedupeKey: `SUSPENSION_CREATED:${susp._id}`,
-            entityType: 'Suspension',
-            entityId: susp._id.toString(),
-          });
-        } catch (err) {
-          console.error('[YellowCardAccumulationService] notify error:', err);
-        }
-      });
+      await NotificationService.notify(
+        {
+          organizationId: organizationId.toString(),
+          recipientClubId: clubId.toString(),
+          type: 'SUSPENSION_CREATED',
+          subject: 'Suspension automatique — accumulation de cartons jaunes',
+          body: `Un joueur a atteint le seuil de ${ruleSetThreshold} cartons jaunes. Une suspension de ${ruleSetSuspensionMatches} match(s) a été créée automatiquement.`,
+          dedupeKey: `SUSPENSION_CREATED:${susp._id}`,
+          entityType: 'Suspension',
+          entityId: susp._id.toString(),
+        },
+        session
+      );
     }
 
     return { card, suspension };
@@ -220,6 +216,7 @@ export class YellowCardAccumulationService {
     // continue in accumulation
     if (cardType === 'SECOND_YELLOW_RED') {
       const sameMatchYellow = await DisciplinaryCard.findOne({
+        organizationId,
         joueurId,
         matchId,
         cardType: 'YELLOW',
@@ -264,22 +261,18 @@ export class YellowCardAccumulationService {
       { session }
     );
 
-    // Notify admin that a decision is required (best-effort)
-    setImmediate(async () => {
-      try {
-        await NotificationService.notify({
-          organizationId: organizationId.toString(),
-          type: 'RED_CARD_DECISION_REQUIRED',
-          subject: 'Carton rouge — décision disciplinaire requise',
-          body: `Un carton rouge (${cardType}) a été homologué. Une décision disciplinaire est requise.`,
-          dedupeKey: `RED_CARD_DECISION_REQUIRED:${suspension._id}`,
-          entityType: 'Suspension',
-          entityId: suspension._id.toString(),
-        });
-      } catch (err) {
-        console.error('[YellowCardAccumulationService] red notify error:', err);
-      }
-    });
+    await NotificationService.notify(
+      {
+        organizationId: organizationId.toString(),
+        type: 'RED_CARD_DECISION_REQUIRED',
+        subject: 'Carton rouge — décision disciplinaire requise',
+        body: `Un carton rouge (${cardType}) a été homologué. Une décision disciplinaire est requise.`,
+        dedupeKey: `RED_CARD_DECISION_REQUIRED:${suspension._id}`,
+        entityType: 'Suspension',
+        entityId: suspension._id.toString(),
+      },
+      session
+    );
 
     return { card, suspension };
   }

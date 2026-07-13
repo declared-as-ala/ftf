@@ -2,7 +2,6 @@ import mongoose from 'mongoose';
 import Match from '../models/Match';
 import Competition from '../models/Competition';
 import Standings from '../models/Standings';
-import Round from '../models/Round';
 import AuditService from './audit.service';
 import connectDB from '../db';
 
@@ -14,11 +13,15 @@ import connectDB from '../db';
 export class StandingsService {
   static async rebuildCompetitionStandings(
     competitionId: string | mongoose.Types.ObjectId,
-    actorId?: string
+    actorId?: string,
+    organizationId?: string | mongoose.Types.ObjectId
   ) {
     await connectDB();
 
-    const competition = await Competition.findById(competitionId);
+    const competition = await Competition.findOne({
+      _id: competitionId,
+      ...(organizationId ? { organizationId } : {}),
+    });
     if (!competition) throw new Error('Compétition introuvable');
 
     const clubIds = competition.clubsParticipants.map((id) => id.toString());
@@ -41,6 +44,7 @@ export class StandingsService {
     // Fetch all finalized matches sorted by date
     const matches = await Match.find({
       competitionId,
+      organizationId: competition.organizationId,
       homologue: true,
       statut: { $in: ['Terminé', 'Forfait'] },
     }).sort({ date: 1 });
@@ -99,7 +103,7 @@ export class StandingsService {
 
     // Upsert standings snapshot
     const doc = await Standings.findOneAndUpdate(
-      { competitionId },
+      { competitionId, organizationId: competition.organizationId },
       {
         organizationId: competition.organizationId,
         saisonId: competition.saisonId,

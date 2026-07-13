@@ -33,7 +33,7 @@ The FTF administrator manually enters official information obtained after each m
 
 Referee role/portal · full electronic match-sheet workflow · VAR management · live referee data entry · ticketing · payments · fan/player/coach accounts · complex transfer workflows · complex licence workflows · public website · billing plans.
 
-Existing unused models (`Licence`, `Transfert`, `Evenement`, `Staff`, `Arbitre` beyond basic CRUD) are **frozen future modules** — not deleted, not extended.
+Existing unused models (`Licence`, `Transfert`, `Evenement`, `Staff`) remain **frozen future modules**. `Arbitre` is an approved future administrative module for referee management and match-official assignment, but it does not introduce a user role, login, dashboard, portal, live referee entry, or electronic match-sheet workflow.
 
 ## 2. Core modules
 
@@ -49,7 +49,7 @@ Authentication · Users & roles · Clubs · Players · Seasons · Competitions �
 ## 4. Permissions
 
 ### FTF_ADMIN can
-Access all federation data · manage seasons/competitions/rules/clubs · create club-admin accounts · manage players & club assignment · create journées · generate or manually create fixtures · modify schedules · enter results/goals/cards · finalize matches · reopen matches with reason · finalize journées · manage red-card decisions · create/correct/cancel suspensions (mandatory reason) · view all audit history · generate reports/exports · manage notifications · manage settings.
+Access all federation data · manage seasons/competitions/rules/clubs · create club-admin accounts · manage players & club assignment · create journées · generate or manually create fixtures · modify schedules · enter results/goals/cards · finalize matches · reopen matches with reason · finalize journées · manage red-card decisions · create/correct/cancel suspensions (mandatory reason) · view all audit history · generate reports/exports · create and send manual club notifications · view delivery/read statistics · archive or duplicate sent notifications · manage settings.
 
 ### CLUB_ADMIN can (own club only, plus shared competition data)
 View club dashboard, players, player profiles, card history, suspensions, eligibility, previous/next matches, match details, goals/cards, standings, notifications · download visible disciplinary decisions · update own password/account info · mark notifications read.
@@ -79,6 +79,8 @@ Must be: **atomic · idempotent · transactional (MongoDB transaction; Docker Mo
 
 ### 5.5 Reopening a match
 FTF_ADMIN only. Requires mandatory reason + confirmation dialog + audit entry + transaction. On reopen: do NOT delete suspensions — reverse or **rebuild derived effects deterministically from authoritative match events** (accumulations, suspensions, serving entries, standings, statistics, notifications). Preserve history.
+
+The current implementation does not yet meet this contract: `MatchCorrectionService` reopens the match and rebuilds standings only. Until deterministic discipline/statistics/notification replay exists, reopening a match that produced disciplinary effects is an integrity-blocking operation and must not be exposed as safe.
 
 ### 5.6 Yellow-card workflow
 ```
@@ -148,7 +150,7 @@ Clubs are officially responsible for monitoring counts ⇒ club portal must clea
 
 | Page | Essentials |
 |---|---|
-| `/admin/dashboard` | Season+competition selectors; counts (clubs, players); current journée; matches awaiting result/finalization; active suspensions; pending red decisions; 2-yellow players; recent finalizations & disciplinary actions; upcoming matches; quick actions (enter journée results, create match, add player, review reds, view suspensions); limited charts (cards/journée, goals/journée, suspensions/club, completion progress) |
+| `/admin/dashboard` | Season+competition selectors; counts (clubs, players); current journée; matches awaiting result/finalization; active suspensions; pending red decisions; 2-yellow players; recent finalizations & disciplinary actions; upcoming matches; compact `Notifications aux clubs` card (unread deliveries, recently sent count, last manual notification, create/history links); quick actions; limited charts |
 | `/admin/seasons` + `[id]` | CRUD, activate current, complete, **end-of-season card clearance**, archive; detail tabs: overview, competitions, discipline summary, clearance history, audit |
 | `/admin/competitions` + `[id]` | List/search/filter/CRUD/archive; workspace tabs: overview, journées, matches, standings, clubs, discipline, statistics, rules, audit |
 | `/admin/competitions/[id]/rounds` | Journée list: number, dates, status, completed/pending, goals, cards, quick "enter results" |
@@ -163,7 +165,7 @@ Clubs are officially responsible for monitoring counts ⇒ club portal must clea
 | `/admin/discipline/anomalies` | Suspended player in event; wrong-club card; duplicate card/suspension; double decrement; official match w/o processing; score≠goals; inconsistent accumulation |
 | `/admin/standings` | Season/competition selection, table, **rebuild button**, calculation timestamp, export |
 | `/admin/users` | List, create club admin, activate/suspend, reset password, require password change, login history |
-| `/admin/notifications` | Sent list: recipient club, type, delivery/read status, related entity |
+| `/admin/notifications` | Overview/history and `Créer une notification`; KPI cards; manual/automatic source, recipient, club, status, date and text filters; delivery/read statistics; view, duplicate and archive actions. Sent content is immutable—corrections are new notifications |
 | `/admin/reports` | See §10 |
 | `/admin/audit` | Read-only; filters user/club/action/entity/date/competition/match |
 | `/admin/settings` | Organization, current season, competition defaults, disciplinary rules, notification templates, security, upload limits, language & timezone |
@@ -172,7 +174,7 @@ Clubs are officially responsible for monitoring counts ⇒ club portal must clea
 
 | Page | Essentials |
 |---|---|
-| `/club/dashboard` | Club identity; **next-match card** (opponent, home/away, date/time, venue, competition, journée, link, unavailable-player count); previous result; standing; played/GF/GA; active suspensions; 2-yellow players; recent cards; recent notifications; upcoming fixtures |
+| `/club/dashboard` | Club identity; **next-match card**; previous result; standing; played/GF/GA; active suspensions; 2-yellow players; recent cards; `Notifications de la FTF` with the latest 3–5 relevant items and important/urgent unread emphasis; upcoming fixtures |
 | `/club/players` + `[id]` | Own players only; columns shirt, position, active yellows, eligibility, suspension, remaining. Detail (own player only): info, stats, goals, cards, accumulation, suspension history, eligibility. **No edit buttons for sporting data** |
 | `/club/matches` + `[id]` | Tabs upcoming/previous/all/postponed. Detail access if club participates or data is shared competition info; goal/card timelines; own-club suspensions & availability; **never opposing club's confidential notes** |
 | `/club/calendar` | Calendar + list: previous, next, postponed, rescheduled |
@@ -180,7 +182,7 @@ Clubs are officially responsible for monitoring counts ⇒ club portal must clea
 | `/club/suspensions` | Sections active/provisional/served/history; per item: player, reason, source match, decision date, total/served/remaining, scope, next applicable match, decision document if visible |
 | `/club/eligibility` | Available / at-risk / suspended / pending-red players; reason; expected return match; **select an upcoming match to view eligibility for that match** |
 | `/club/standings` | Full table, own club highlighted, last update, recent form if derivable |
-| `/club/notifications` | All federation notifications; mark read |
+| `/club/notifications` | Own-club automatic and manual federation notifications; all/unread/important/urgent/category filters; safe internal actions; mark one or all read. No edit/delete, recipient-list, or audit access |
 | `/club/profile` | View club info; update own account; change password. No club sporting-data edits |
 
 ### 7.3 Navigation
@@ -191,7 +193,35 @@ Clubs are officially responsible for monitoring counts ⇒ club portal must clea
 
 ## 8. Notifications (in-app first; email only if SMTP configured)
 
-Triggers: new card · two active warnings reached · yellow threshold reached · red provisional suspension · red decision finalized · suspension amended · suspension cancelled · suspension fully served · match postponed · match rescheduled · result published. **No duplicates on finalization retry.**
+### 8.1 Sources and automatic triggers
+
+The single notification center distinguishes `SYSTEM` (`Notification automatique`) from `MANUAL` (`Notification manuelle`). Automatic triggers include new card · two active warnings reached · yellow threshold reached · red provisional suspension · red decision finalized · suspension amended/cancelled/served · referee assignment published/updated/cancelled · match postponed/rescheduled · result published. **No duplicates on service or finalization retry.**
+
+### 8.2 Manual club notifications
+
+Only `FTF_ADMIN` may compose and send a manual plain-text notification to all active clubs, one active club, or multiple active clubs. `CLUB_ADMIN` may only receive notifications addressed to its session-derived club and mark that club's delivery read.
+
+Required content: title (trimmed, 3–150 characters) and message (trimmed, 3–5000 characters, line breaks preserved). Optional content: action label, allowlisted internal `/club/...` path, and future expiration date. Administrator text is never rendered as raw HTML.
+
+Categories: `GENERAL_ANNOUNCEMENT`, `COMPETITION`, `MATCH`, `DISCIPLINE`, `ADMINISTRATIVE`, `DOCUMENT_REQUEST`, `MEETING`, `SYSTEM`. Priorities: `NORMAL`, `IMPORTANT`, `URGENT`; urgent styling is reserved for genuinely time-critical notices.
+
+Target types are `ALL_ACTIVE_CLUBS`, `SINGLE_CLUB`, and `MULTIPLE_CLUBS`. For all-club sends, the server resolves active clubs in the authenticated administrator's organization and ignores client club IDs. Single/multiple sends validate active organization membership and reject or normalize duplicate IDs.
+
+### 8.3 Send, history, expiration, and audit
+
+```text
+compose → choose recipients → validate → preview → confirm
+→ transaction creates notification + one recipient record per club
+→ club notification centers display it → audit entry is written
+```
+
+The preview and confirmation show title, priority and authoritative recipient count. Delivered notification content is immutable. A correction is a new notification; duplication creates a prefilled new draft and does not silently resend. Archiving changes the admin history state without deleting delivery/read history or retracting it from clubs. Expired notifications remain in history but are no longer highlighted as active.
+
+Audit actions: `MANUAL_NOTIFICATION_CREATED`, `MANUAL_NOTIFICATION_SENT`, `MANUAL_NOTIFICATION_BROADCAST_SENT`, `NOTIFICATION_DUPLICATED`, and `NOTIFICATION_ARCHIVED`. Audit metadata includes actor, notification ID, target type, recipient count, selected club IDs where relevant, title, priority, sent date, and request ID—but not the full message body.
+
+### 8.4 Delivery guarantees
+
+Read/unread state is per club, not global. A unique `(notificationId, clubId)` recipient index prevents duplicate delivery inside a broadcast. Automatic sends use a unique organization-scoped `dedupeKey`; manual POST retries use an organization-scoped idempotency key. Parent and recipient creation is transactional so partial delivery is rolled back and reported rather than silently accepted.
 
 ## 9. Search, filtering, imports
 
@@ -244,3 +274,106 @@ DB indexes · pagination everywhere · lean read queries · field selection · n
 ## 13. Seed data (development)
 
 1 FTF admin · 8+ clubs with club admins · 18+ players per club · one active season · one league competition with journées · matches in mixed states · cards and suspensions that exercise the discipline engine. **Seed never runs in production.**
+
+## 14. Referee administration and club visibility (approved future scope)
+
+### 14.1 Scope and roles
+
+The role type remains exactly `"FTF_ADMIN" | "CLUB_ADMIN"`. Referees are administrative entities, not users. There is no referee account, authentication flow, dashboard, portal, live data-entry surface, or digital match sheet.
+
+- `FTF_ADMIN` manages referee records, availability/status, assignments, publication, changes, cancellation, conflicts, and internal assignment history.
+- `CLUB_ADMIN` can only view a published assignment for a match involving its session-derived club and receive the related in-app notifications.
+- Draft assignments, private notes, audit history, change reasons, contact details, and internal comments are never returned by club APIs.
+
+### 14.2 Referee registry
+
+Adapt the existing French `Arbitre` model. The registry supports create, edit, activate/deactivate, archive, search, category/status/city or region filters, assigned-match count, and upcoming/previous assignment views. Canonical statuses are `ACTIVE`, `UNAVAILABLE`, `SUSPENDED`, `INACTIVE`, and `ARCHIVED`; canonical categories are `ELITE`, `NATIONAL`, and `REGIONAL`.
+
+Photos are optional legacy data. The main create/edit flow has no photo upload. Lists use one local Lucide `UserRound` icon in a rounded deep-navy or neutral avatar container, including when a legacy photo path is absent or invalid; no external image URL or broken placeholder is permitted.
+
+### 14.3 Assignment and publication workflow
+
+On `/admin/competitions/[competitionId]/rounds/[roundId]`, each match supports a main referee and optional first assistant, second assistant, and fourth official:
+
+```text
+open journée/match → save draft → validate conflicts → publish
+→ notify both participating clubs → expose the published public DTO
+```
+
+The main referee is required to publish. `DRAFT` is never visible to clubs. A published assignment change requires a reason, creates a new version and audit entry, notifies both clubs, and is shown as updated. Cancellation is audited and notified. Repeating publish for the same version is idempotent.
+
+Publication must reject a missing or non-active main referee, unavailable/suspended/inactive/archived officials, duplicate roles within one match, invalid match/journée/date, and an official assigned to conflicting match times. Near-time conflicts use an explicit configurable turnaround window and are never silently accepted.
+
+### 14.4 Club experience
+
+- `/club/dashboard`: the first upcoming match is a prominent clickable card with competition, journée, home/away context, opponent and logo, date/time, stadium, match status, unavailable-player count, detail link, and published officials. Otherwise show `Arbitre non encore désigné`.
+- `/club/matches`: upcoming and previous cards/rows include the published main referee and a detail link; previous matches retain score, goals, cards, and referee.
+- `/club/matches/[id]`: show complete public match metadata, score/events after play, own-club eligibility and suspensions, plus only the published main/assistant/fourth officials, main-referee category, and publication date.
+
+### 14.5 Notifications and audit
+
+Notification types are `REFEREE_ASSIGNMENT_PUBLISHED`, `REFEREE_ASSIGNMENT_UPDATED`, and `REFEREE_ASSIGNMENT_CANCELLED`. Each notification includes competition, journée, clubs, match date/time, stadium, public official names, and a deep link. Dedupe key format is `<TYPE>:<matchId>:<assignmentVersion>:<recipientClubId>` so both clubs receive one notification each without collisions.
+
+Audit actions cover referee create/update/archive and assignment create/publish/change/cancel, with actor, match, before/after assignment, mandatory reason where applicable, timestamp, and request ID.
+
+### 14.6 Acceptance criteria
+
+1. A draft assignment is absent from every club payload and page.
+2. A club cannot read a match or assignment for another club.
+3. A club payload contains no internal notes, audit data, contact details, referee report, or change reason.
+4. One referee cannot occupy two roles in a match or conflicting matches.
+5. Publishing without an active main referee fails.
+6. Re-publishing one version does not duplicate notifications.
+7. Updating a published assignment without a reason fails; a successful update creates a versioned audit record and two club notifications.
+8. Archived referees remain resolvable in historical assignments but cannot receive new assignments.
+
+## 15. Official match workspace (future scope — approval gated)
+
+### 15.1 Workspace and state transitions
+
+The canonical admin detail is `/admin/matches/[id]`; `/admin/matchs/[id]` remains a temporary compatibility alias. It is one match workspace with keyboard-accessible tabs: `Vue d’ensemble`, `Résultat`, `Buts`, `Cartons`, `Discipline`, `Arbitres`, and `Historique`. The persistent header shows competition, journée, clubs/logos, score, canonical status, date/time, stadium/city, main referee when publishable, and the single contextual primary action.
+
+Draft matches may be edited. Official matches are read-only until an `FTF_ADMIN` explicitly reopens them with a reason and confirmation. Finalize and reopen are server-authoritative state transitions; hiding UI controls is not authorization. `CLUB_ADMIN` never receives an editing action.
+
+### 15.2 Structured result, goal, and card entry
+
+- Result fields: home score, away score, status, date/time, stadium, city, main referee, optional assistants, and internal notes. Scores are never rewritten during GET.
+- Goal types: `GOAL`, `OWN_GOAL`, and `PENALTY_GOAL`; fields include player, player club, minute, stoppage minute, optional assist, notes, and immutable source identity. An own goal credits the opponent's score while retaining the player's club.
+- Card types: `YELLOW`, `SECOND_YELLOW_RED`, and `DIRECT_RED`; fields include player, club, minute, stoppage minute, reason, report reference, and notes.
+- Events are draft records that can be edited or cancelled before finalization. Cancellation preserves history. Player/assist membership, club participation, minute bounds, duplicate/idempotency keys, and same-player/same-match disciplinary combinations are validated server-side.
+
+Score and active goal totals must agree before finalization. A limited administrative/forfeit score may continue only through an explicit override containing an allowed reason code, explanation, actor, timestamp, and audit entry. A non-zero score with zero recorded goals is also a mismatch; it is never silently accepted.
+
+### 15.3 Discipline impact and anomaly handling
+
+The `Discipline` tab is a derived projection, not another editable source of truth. It shows confirmed cards, yellow accumulation before/after, generated/provisional/final suspensions, serving-ledger changes, the next affected official match, delivered club notices, and anomalies. A suspended scorer/card recipient or wrong-club player creates a reviewable anomaly; finalization requires an explicit, audited confirmation where policy permits it and never applies a sporting or financial sanction automatically.
+
+Rule evaluation uses the versioned `DisciplinaryRuleSet` applicable to the organization, season, competition, and match date. Second-yellow dismissal does not double-count the absorbed yellow. Direct red creates a provisional suspension with no assumed one-match final punishment; a later reasoned decision confirms, reduces, extends, cancels, or marks it already served.
+
+Automatic notification events are `YELLOW_THRESHOLD_REACHED`, `RED_CARD_PROVISIONAL_SUSPENSION`, and `SUSPENSION_CONFIRMED`. They include the player/club, source match, competition/journée/date, rule-derived total/served/remaining values, suspension link, and the next applicable match (opponent, date/time, stadium) when determinable; otherwise they state that the affected match awaits calendar publication. Correction/replay creates a new versioned correction notice or reconciles an unsent intent—never mutates a delivered notice or duplicates it.
+
+### 15.4 Transactional completion and correction
+
+Finalization atomically validates the aggregate, claims one processing version, marks the result official, materializes cards/suspensions/serving entries, records durable notification intent, and writes audit history. Any required discipline write failure rolls back the match finalization. Retries and concurrent calls cannot duplicate cards, suspensions, ledger entries, notifications, statistics, or standings effects.
+
+Reopening preserves authoritative event history and reverses or deterministically rebuilds every derived effect before returning the match to draft: cards and accumulations, red cases and suspensions, serving entries, eligibility, player statistics, standings, notification corrections, and audit history. A durable replay/reconciliation mechanism owns post-transaction projections; best-effort callbacks are insufficient for required effects.
+
+### 15.5 Club visibility and dependencies
+
+Club match APIs return allowlisted DTOs only. A participating `CLUB_ADMIN` sees public match metadata, official score/events, its own players' availability/suspensions, and its own relevant disciplinary notifications—never opponent eligibility, internal notes, referee report, audit metadata, override explanation, or draft events.
+
+The club dashboard's next-match card shows opponent and home/away context, competition/journée, date/time/stadium, published referee, suspended count, at-risk count, and a detail link. `Joueurs indisponibles pour ce match` lists only the authenticated club's player, reason, remaining matches, and expected return. Before play, club match detail shows own unavailable/at-risk players; after play it adds the official goal/card timeline and only discipline impact involving that club.
+
+The `Arbitres` tab consumes the versioned assignment contract from Phase 9; until that phase is implemented it may show only a read-only legacy summary. Automatic match/discipline notifications consume the parent/recipient and idempotency contract from Phase 10; this workspace must not create a second notification architecture. No referee or player role is introduced.
+
+### 15.6 Acceptance criteria
+
+1. Adding a goal never silently marks a match finished or official.
+2. Two sequential or concurrent finalization calls produce one complete set of effects.
+3. Injected discipline failure rolls back finalization; no official match is left partly processed.
+4. Goal totals, including own goals, match the score or require a documented audited override.
+5. A finalized match cannot be edited; reopen without a reason fails.
+6. Reopen/re-finalize reconstructs exactly one correct set of derived effects.
+7. Serving ledger `(suspensionId, matchId)` creation and decrement are atomic and idempotent.
+8. A club response contains only its authorized public and own-club fields.
+9. Every tab has loading, empty, error, denied, draft, and official states where applicable and works at 375 px without horizontal page scrolling.

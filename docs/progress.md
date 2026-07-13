@@ -31,6 +31,9 @@
 | Phase 7 — Reports, Audit UI, Search, Imports | 🟨 | see Batch 11 log | 2026-07-10 | **Phase 7 partielle** — 69 tests verts; ReportService + reports page, audit page, users CRUD, settings, search API |
 | Phase 8 — Production Ready | ⬜ | | | |
 | Phase 8 — Realistic large development seed | ✅ | `scripts/seed.ts` | 2026-07-11 | 16 LP1 clubs, 384 players, 30 rounds, 240 matches, discipline/standings/notifications/audit |
+| Phase 9 — Referee Assignment & Club Visibility | ⬜ | docs only (see Batch 15) | 2026-07-13 | Future, approval-gated; no implementation started |
+| Phase 10 — Manual Club Notifications | ⬜ | docs only (see Batch 16) | 2026-07-13 | Future, approval-gated; no implementation started |
+| Phase 11 — Official Match Workspace & Integrity Hardening | ⬜ | docs only (see Batch 17) | 2026-07-13 | Future, approval-gated; P0 integrity hardening precedes UI; no implementation started |
 
 ## Batch log
 
@@ -209,6 +212,41 @@
 - **Modified:** `app/api/club/players/[id]/route.ts` (payload stats complet, toujours scopé clubId) · `app/{club/players,admin/joueurs}/[id]/page.tsx` (pages fines → PlayerProfile partagé) · `app/api/club/matches/[id]/route.ts` (+`clubEligibility` : joueurs suspendus/indisponibles + joueurs à risque du club authentifié uniquement — jamais l'adversaire) · `app/club/matches/[id]/page.tsx` (redesign : bandeau navy avec logos/score, film du match aligné domicile/extérieur, **carte "Joueurs suspendus — indisponibles"** + carte "À risque" cliquables vers la fiche joueur) · `app/admin/competitions/[id]/standings/page.tsx` (**section "Meilleurs buteurs"** top 10 avec photos, clubs, liens fiche joueur)
 - **Tests run:** `npx tsc --noEmit` clean · smoke HTTP réel (2 rôles) : admin — stats joueur (6 buts, 22 matchs) ✅, top-scorers (10 buteurs, meilleur 11 buts) ✅, pages 200 ✅ ; club (EST) — stats joueur ✅, match avec `clubEligibility` (8 à risque, seuil 3) ✅, pages 200 ✅ ; **isolation : CLUB_ADMIN sur API admin → 403** ✅
 - **Remaining issues:** minutes affichées = estimation (matchs × 90, libellée comme telle — pas de suivi des remplacements) ; buteurs non affichés côté club standings (extension facile si demandée)
+
+### Batch 15 — Referee assignment discovery and documentation (2026-07-13) ✅
+
+- **Scope:** documentation and repository audit only. No feature code, schema, route, UI, seed, or migration was changed or executed.
+- **Audited:** existing `Arbitre`/`Match`/`Round`/`Notification`/`AuditLog` models; referee CRUD; journée/admin match pages and APIs; club dashboard/match APIs/pages; auth helpers; notification and audit services.
+- **Key findings:** `Arbitre` already has basic photo-oriented CRUD, legacy categories, `actif`, availability arrays and denormalized match/stat counters, but lacks code/licence/status/archive/search/filter/audit/org-safe queries and a detail endpoint. `Match` has only `arbitrePrincipalId` plus an untyped assistants array and no draft/publication/version/history metadata. The journée page is result-entry focused and has no official assignment controls. Notification dedupe and immutable audit infrastructure are reusable.
+- **Security prerequisite:** club match detail currently spreads the full Match document and populates the main referee unconditionally; broad dashboard/list match serialization also lacks a publication DTO. Explicit allowlisted public DTOs must land before assignment visibility.
+- **Decision:** adapt `Arbitre`; add a separate versioned `MatchOfficialAssignment`; legacy match referee fields become read-only compatibility data; migrated legacy assignments remain DRAFT until reviewed. Preserve exactly `FTF_ADMIN` and `CLUB_ADMIN`.
+- **Documentation modified:** `docs/product-specification.md`, `docs/database.md`, `docs/api.md`, `docs/ui-ux.md`, `docs/implementation-roadmap.md`, `docs/progress.md`.
+- **Verification:** documentation diff reviewed; scope/role terms checked; no code tests required for this batch.
+- **Next batch proposed (not approved):** Sprint 9.1 — referee registry model and safe CRUD. Wait for explicit owner approval before implementation.
+
+### Batch 16 — Manual club-notification discovery and documentation (2026-07-13) ✅
+
+- **Scope:** documentation and repository audit only. No notification model, recipient collection, migration, route, service, UI, seed, or test implementation was changed or executed.
+- **Audited:** `Notification` and `Club` models; `NotificationService`; current automatic callers; admin/club notification APIs and pages; both dashboards; `NotificationItem`; auth, audit, tests and seed usage.
+- **Existing architecture:** one notification document currently stores content, `recipientClubId`, `read/readAt`, and a globally unique `dedupeKey`. `NotificationService.notify()` gives safe automatic single-recipient upserts. Club reads are session-scoped, and audit/transaction infrastructure is reusable.
+- **Gaps/defects:** broadcast content would be duplicated; read statistics are document-level; no source/category/priority/target/action/expiration/status/creator; no manual POST/detail/duplicate/archive/read-all APIs; admin history lacks delivery aggregates and incorrectly calls the club mark-read API with the wrong field; club dashboard has only an unread count.
+- **Decision:** extend one immutable parent `Notification` and add one `NotificationRecipient` per addressed club. Preserve automatic `dedupeKey`; add manual `Idempotency-Key`; unique `(notificationId, clubId)` prevents recipient duplication. All-active recipients are resolved server-side from active clubs in the admin's organization.
+- **Security:** `requireAdmin()` for compose/history/statistics/archive/duplicate; `requireClub()` and session-derived club ID for list/read/read-all; allowlisted internal links; plain-text rendering; transaction rollback on any fan-out failure; full message omitted from audit.
+- **Documentation modified:** `docs/product-specification.md`, `docs/database.md`, `docs/api.md`, `docs/ui-ux.md`, `docs/implementation-roadmap.md`, `docs/progress.md`.
+- **Verification:** documentation consistency/diff check; no code tests required for a documentation-only batch.
+- **Next batch proposed (not approved):** Sprint 10.1 — notification parent/recipient model, validator, service compatibility and migration. Wait for explicit owner approval.
+
+### Batch 17 — Official match-workspace discovery and documentation (2026-07-13) ✅
+
+- **Scope:** repository audit, target data flow, UI/UX contract, tests and roadmap only. No model, migration, service, route, page, seed or test implementation was changed or executed.
+- **Audited:** current admin/club match detail pages and APIs; embedded event model/validators; canonical card/rule/suspension/ledger models; finalization/correction/discipline/eligibility/red-decision/notification services; anomaly/audit/report reuse surfaces; event migration history.
+- **Reusable:** `MatchFinalizationService` transaction/processing-version foundation, versioned `DisciplinaryRuleSet`, canonical card/suspension/ledger models, `EligibilityService`, `AuditService`/`AuditTimeline`, `ReportService` CSV base, badges/form/dialog primitives, and club session scoping patterns.
+- **Release-blocking findings:** finalization catches discipline failures and may commit an official but partly processed match; serving/notifications/projections are best-effort after commit; reopen rebuilds standings only; ledger create/decrement is not atomic; legacy event POST can silently set `Terminé`; admin match/event queries lack organization scope; read APIs recalculate stored scores; club detail spreads confidential Match fields.
+- **Data decision:** create canonical normalized `MatchEvent` with stable idempotency/source IDs and soft cancellation. Migration 005 is unrelated and deliberately leaves embedded match events. Discipline impact remains a derived projection; persist only reviewable anomaly resolution if required.
+- **Dependencies:** the `Arbitres` tab consumes Phase 9 published assignments; automatic club delivery consumes Phase 10 parent/recipient notifications. Roles remain exactly `FTF_ADMIN` and `CLUB_ADMIN`.
+- **Documentation modified:** `docs/product-specification.md`, `docs/database.md`, `docs/api.md`, `docs/ui-ux.md`, `docs/testing.md`, `docs/implementation-roadmap.md`, `docs/progress.md`.
+- **Verification:** documentation-only diff and whitespace/link consistency checks; no code tests applicable.
+- **Next batch proposed (not approved):** Sprint 11.1 — add characterization/failure/concurrency tests, then make finalization, ledger processing and correction rebuild atomic/idempotent before any workspace UI. Wait for explicit owner approval.
 
 ## Open blockers & user actions
 
