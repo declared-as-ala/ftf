@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { Trophy } from 'lucide-react';
+import Link from 'next/link';
+import { Trophy, Goal } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -27,10 +28,25 @@ interface StandingRow {
   points: number;
 }
 
+interface TopScorer {
+  _id: string;
+  goals: number;
+  joueur: {
+    _id: string;
+    nom: string;
+    prenom: string;
+    numeroMaillot?: number;
+    photo?: string;
+  };
+  club?: { _id: string; nom: string; code?: string; logo?: string };
+}
+
 export default function ClassementPage() {
   const [competitions, setCompetitions] = useState<CompetitionOption[]>([]);
   const [selectedCompetitionId, setSelectedCompetitionId] = useState('');
   const [standings, setStandings] = useState<StandingRow[]>([]);
+  const [scorers, setScorers] = useState<TopScorer[]>([]);
+  const [scorersLoading, setScorersLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,6 +95,34 @@ export default function ClassementPage() {
     };
 
     fetchStandings();
+  }, [selectedCompetitionId]);
+
+  useEffect(() => {
+    const fetchScorers = async () => {
+      if (!selectedCompetitionId) {
+        setScorers([]);
+        return;
+      }
+      try {
+        setScorersLoading(true);
+        const res = await fetch(
+          `/api/admin/competitions/${selectedCompetitionId}/top-scorers?limit=10`,
+          { cache: 'no-store' }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setScorers(data.scorers || []);
+        } else {
+          setScorers([]);
+        }
+      } catch {
+        setScorers([]);
+      } finally {
+        setScorersLoading(false);
+      }
+    };
+
+    fetchScorers();
   }, [selectedCompetitionId]);
 
   const selectedCompetition = competitions.find((c) => c._id === selectedCompetitionId);
@@ -215,6 +259,85 @@ export default function ClassementPage() {
           )}
         </CardContent>
       </Card>
+
+      {selectedCompetitionId && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Goal className="h-5 w-5 text-emerald-600" />
+              Meilleurs buteurs {selectedCompetition ? `– ${selectedCompetition.nom}` : ''}
+            </CardTitle>
+            <CardDescription>
+              Buts comptabilisés sur les matchs homologués de cette compétition
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {scorersLoading ? (
+              <div className="flex justify-center py-8">
+                <InlineLoader size="lg" />
+              </div>
+            ) : scorers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aucun but homologué pour le moment dans cette compétition.
+              </p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {scorers.map((s, i) => (
+                  <Link
+                    key={s._id}
+                    href={`/admin/joueurs/${s.joueur._id}`}
+                    className="flex items-center gap-3 rounded-lg border p-2.5 transition-colors hover:bg-accent/50"
+                  >
+                    <span
+                      className={cn(
+                        'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black',
+                        i === 0
+                          ? 'bg-amber-400/20 text-amber-600 dark:text-amber-400'
+                          : i === 1
+                            ? 'bg-slate-400/20 text-slate-600 dark:text-slate-300'
+                            : i === 2
+                              ? 'bg-amber-700/20 text-amber-700 dark:text-amber-500'
+                              : 'bg-muted text-muted-foreground'
+                      )}
+                    >
+                      {i + 1}
+                    </span>
+                    <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-muted">
+                      {s.joueur.photo ? (
+                        <Image src={s.joueur.photo} alt={s.joueur.nom} fill className="object-cover" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-xs font-bold text-muted-foreground">
+                          {s.joueur.prenom?.[0]}
+                          {s.joueur.nom?.[0]}
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">
+                        {s.joueur.prenom} {s.joueur.nom}
+                        {s.joueur.numeroMaillot && (
+                          <span className="font-normal text-muted-foreground"> #{s.joueur.numeroMaillot}</span>
+                        )}
+                      </p>
+                      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        {s.club?.logo && (
+                          <span className="relative h-3.5 w-3.5 shrink-0">
+                            <Image src={s.club.logo} alt="" fill className="object-contain" />
+                          </span>
+                        )}
+                        <span className="truncate">{s.club?.nom || '—'}</span>
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xl font-black tabular-nums text-emerald-600 dark:text-emerald-400">
+                      {s.goals}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
