@@ -14,7 +14,7 @@ export class RoundService {
     organizationId?: string | mongoose.Types.ObjectId
   ): Promise<boolean> {
     await connectDB();
-    
+
     const matches = await Match.find({
       roundId,
       ...(organizationId ? { organizationId } : {}),

@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "cross-env NODE_ENV=production next build",
-    "start": "next start",
+    "dev": "node api.js && next dev",
+    "build": "node api.js && cross-env NODE_ENV=production next build",
+    "start": "node api.js && next start",
     "lint": "eslint",
     "seed": "tsx scripts/seed.ts",
     "bootstrap": "tsx scripts/bootstrap.ts",
