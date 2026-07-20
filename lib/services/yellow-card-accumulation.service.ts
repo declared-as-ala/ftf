@@ -36,6 +36,7 @@ export class YellowCardAccumulationService {
       ruleSetSuspensionMatches,
       ruleSetScope,
       matchIsOfficial,
+      sourceEventId,
     }: {
       matchId: string | mongoose.Types.ObjectId;
       joueurId: string | mongoose.Types.ObjectId;
@@ -50,6 +51,7 @@ export class YellowCardAccumulationService {
       ruleSetSuspensionMatches: number;
       ruleSetScope: string;
       matchIsOfficial: boolean;
+      sourceEventId?: string | mongoose.Types.ObjectId;
     },
     session: mongoose.ClientSession
   ) {
@@ -81,6 +83,7 @@ export class YellowCardAccumulationService {
           accumulationStatus: matchIsOfficial ? 'ACTIVE' : 'NOT_OFFICIAL',
           accumulationCount: newCount,
           notes,
+          sourceEventId,
         },
       ],
       { session }
@@ -177,6 +180,7 @@ export class YellowCardAccumulationService {
       minute,
       notes,
       matchIsOfficial,
+      sourceEventId,
     }: {
       matchId: string | mongoose.Types.ObjectId;
       joueurId: string | mongoose.Types.ObjectId;
@@ -189,6 +193,7 @@ export class YellowCardAccumulationService {
       minute?: number;
       notes?: string;
       matchIsOfficial: boolean;
+      sourceEventId?: string | mongoose.Types.ObjectId;
     },
     session: mongoose.ClientSession
   ) {
@@ -207,6 +212,7 @@ export class YellowCardAccumulationService {
           minute,
           accumulationStatus: 'ACTIVE', // Not consumed — red card suspensions are separate
           notes,
+          sourceEventId,
         },
       ],
       { session }

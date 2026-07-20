@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import Match from '../models/Match';
+import MatchEvent from '../models/MatchEvent';
 import AuditService from './audit.service';
 import { DisciplineEngine } from './discipline-engine';
 import { SuspensionService } from './suspension.service';
@@ -72,6 +73,25 @@ export class MatchFinalizationService {
         if (!claimedMatch) return;
         finalized = true;
 
+        const canonicalEvents = await MatchEvent.find({
+          organizationId,
+          matchId,
+          status: 'DRAFT',
+        }).session(session);
+        if (canonicalEvents.length > 0) {
+          const active = canonicalEvents.filter((event) => event.status !== 'CANCELLED');
+          const derived = this._deriveCanonicalScore(claimedMatch, active);
+          const mismatch = derived.home !== claimedMatch.scoreHome || derived.away !== claimedMatch.scoreAway;
+          if (mismatch && !claimedMatch.scoreOverride?.explanation) {
+            throw new Error(`Le score saisi ne correspond pas aux buts enregistrés (${derived.home}-${derived.away}).`);
+          }
+          await MatchEvent.updateMany(
+            { organizationId, matchId, status: 'DRAFT' },
+            { $set: { status: 'CONFIRMED' } },
+            { session }
+          );
+        }
+
         // Required discipline effects are not best-effort. Any exception aborts
         // officialization, cards, suspensions, ledger, notifications and audit.
         await DisciplineEngine.processMatchCards(
@@ -86,6 +106,7 @@ export class MatchFinalizationService {
             awayClubId: claimedMatch.awayClubId,
             date: claimedMatch.date,
             evenements: claimedMatch.evenements || [],
+            canonicalEvents,
           },
           session
         );
@@ -169,6 +190,19 @@ export class MatchFinalizationService {
     }
 
     return null;
+  }
+
+  private static _deriveCanonicalScore(match: any, events: any[]) {
+    let home = 0;
+    let away = 0;
+    for (const event of events) {
+      if (!['GOAL', 'OWN_GOAL', 'PENALTY_GOAL'].includes(event.type)) continue;
+      const isHomeClub = event.clubId.toString() === match.homeClubId.toString();
+      const creditsHome = event.type === 'OWN_GOAL' ? !isHomeClub : isHomeClub;
+      if (creditsHome) home += 1;
+      else away += 1;
+    }
+    return { home, away };
   }
 
   static async rescheduleMatch(

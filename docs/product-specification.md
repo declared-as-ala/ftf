@@ -80,7 +80,7 @@ Must be: **atomic · idempotent · transactional (MongoDB transaction; Docker Mo
 ### 5.5 Reopening a match
 FTF_ADMIN only. Requires mandatory reason + confirmation dialog + audit entry + transaction. On reopen: do NOT delete suspensions — reverse or **rebuild derived effects deterministically from authoritative match events** (accumulations, suspensions, serving entries, standings, statistics, notifications). Preserve history.
 
-The current implementation does not yet meet this contract: `MatchCorrectionService` reopens the match and rebuilds standings only. Until deterministic discipline/statistics/notification replay exists, reopening a match that produced disciplinary effects is an integrity-blocking operation and must not be exposed as safe.
+Sprint 11.1 now fails closed: a discipline-free official match can be reopened transactionally and queues durable standings/round repair, while any match with cards, source suspensions, or serving-ledger effects returns a conflict until canonical event replay exists. Deterministic discipline/statistics/notification replay remains a Sprint 11.2 prerequisite for those corrections.
 
 ### 5.6 Yellow-card workflow
 ```

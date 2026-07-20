@@ -1,0 +1,7 @@
+import { NextResponse } from 'next/server';
+import { ApiError, apiError, requireAdmin } from '@/lib/api';
+import MatchWorkspaceService from '@/lib/services/match-workspace.service';
+import { matchEventCancelSchema, matchEventUpdateSchema } from '@/lib/validators/match-event';
+export const runtime = 'nodejs';
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string; eventId: string }> }) { try { const session = await requireAdmin(); const p = await params; const event = await MatchWorkspaceService.updateEvent(p.id, p.eventId, session.user.organizationId!, session.user.id, matchEventUpdateSchema.parse(await req.json())); return NextResponse.json({ event }); } catch (error) { if (['EVENT_LOCKED','EVENT_NOT_FOUND'].includes((error as Error).message)) return apiError(new ApiError((error as Error).message === 'EVENT_NOT_FOUND' ? 404 : 409, 'Événement introuvable ou verrouillé'), 'PUT event'); return apiError(error, 'PUT event'); } }
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string; eventId: string }> }) { try { const session = await requireAdmin(); const p = await params; const { reason } = matchEventCancelSchema.parse(await req.json()); const event = await MatchWorkspaceService.cancelEvent(p.id, p.eventId, session.user.organizationId!, session.user.id, reason); return NextResponse.json({ event }); } catch (error) { return apiError(error, 'DELETE event'); } }

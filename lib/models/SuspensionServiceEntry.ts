@@ -31,6 +31,9 @@ export interface ISuspensionServiceEntry extends Document {
   processedAt: Date;
   processedBy: string;     // 'SYSTEM' or userId
   notes?: string;
+  reversedAt?: Date;
+  reversedBy?: mongoose.Types.ObjectId;
+  reversalReason?: string;
 }
 
 const SuspensionServiceEntrySchema = new Schema<ISuspensionServiceEntry>(
@@ -62,6 +65,9 @@ const SuspensionServiceEntrySchema = new Schema<ISuspensionServiceEntry>(
     processedAt: { type: Date, default: () => new Date() },
     processedBy: { type: String, required: true },
     notes: String,
+    reversedAt: Date,
+    reversedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    reversalReason: String,
   },
   { timestamps: false }
 );

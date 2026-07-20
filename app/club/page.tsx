@@ -5,15 +5,28 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Users, Calendar, Shield, AlertTriangle, Trophy, Bell } from 'lucide-react';
+import { Users, Calendar, Shield, AlertTriangle, Trophy, Bell, UserRound } from 'lucide-react';
+
+interface PublishedOfficialsDTO {
+  publishedAt: string | null;
+  referees: { displayName: string; role: string; categorie?: string }[];
+}
 
 interface DashboardData {
   totalJoueurs: number;
-  prochainsMatchs: any[];
+  prochainsMatchs: ({
+    _id: string;
+    date: string;
+    stade?: string;
+    homeClubId?: { nom: string };
+    awayClubId?: { nom: string };
+    publishedOfficials?: PublishedOfficialsDTO | null;
+  })[];
   suspensionsActives: any[];
   cardsThisSeason: number;
   monClassement: any;
   unreadNotifs: number;
+  nextMatchSummary?: { matchId: string; suspendedCount: number; atRiskCount: number } | null;
 }
 
 export default function ClubDashboard() {
@@ -84,10 +97,10 @@ export default function ClubDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {data.prochainsMatchs.map((m: any) => (
+                {data.prochainsMatchs.map((m) => (
                   <Link key={m._id} href={`/club/matches/${m._id}`} className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-accent">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
                         {m.homeClubId?.nom} vs {m.awayClubId?.nom}
                       </p>
                       <p className="text-xs text-muted-foreground">
@@ -95,8 +108,25 @@ export default function ClubDashboard() {
                           day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
                         })}
                       </p>
+                      {m.publishedOfficials && m.publishedOfficials.referees.length > 0 && (() => {
+                        const main = m.publishedOfficials.referees.find((r: { role: string }) => r.role === 'MAIN');
+                        return main ? (
+                          <p className="mt-0.5 flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
+                            <UserRound className="h-3 w-3" />
+                            {main.displayName}
+                          </p>
+                        ) : null;
+                      })()}
                     </div>
-                    <Badge variant="outline">{m.stade}</Badge>
+                    <div className="ml-3 flex flex-col items-end gap-1">
+                      <Badge variant="outline">{m.stade}</Badge>
+                      {data.nextMatchSummary?.matchId === m._id && (
+                        <>
+                          <span className="text-xs text-red-600">{data.nextMatchSummary?.suspendedCount ?? 0} suspendu(s)</span>
+                          <span className="text-xs text-amber-600">{data.nextMatchSummary?.atRiskCount ?? 0} à risque</span>
+                        </>
+                      )}
+                    </div>
                   </Link>
                 ))}
               </div>
