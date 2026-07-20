@@ -7,13 +7,19 @@ import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, MapPin, CalendarDays, UserRound, Ban, AlertTriangle, Goal, RectangleVertical } from 'lucide-react';
+import { ArrowLeft, MapPin, CalendarDays, UserRound, Ban, AlertTriangle, Goal, RectangleVertical, Users } from 'lucide-react';
 
 interface ClubRef {
   _id: string;
   nom: string;
   logo?: string;
   code?: string;
+}
+
+interface OfficialRef {
+  displayName: string;
+  role: string;
+  categorie?: string;
 }
 
 interface MatchDetail {
@@ -24,11 +30,15 @@ interface MatchDetail {
   scoreHome: number;
   scoreAway: number;
   stade: string;
+  venueCity?: string;
   homeClubId: ClubRef;
   awayClubId: ClubRef;
   competitionId: { _id: string; nom: string };
   saisonId: { _id: string; nom: string };
-  arbitrePrincipalId?: { _id: string; nom: string; prenom: string };
+  publishedOfficials?: {
+    publishedAt: string | null;
+    referees: OfficialRef[];
+  } | null;
   evenements: any[];
   isOfficial: boolean;
   homologue: boolean;
@@ -71,9 +81,9 @@ function ClubBlock({ club, align }: { club: ClubRef; align: 'left' | 'right' }) 
 }
 
 function eventIcon(type: string) {
-  if (type === 'But') return <Goal className="h-4 w-4 text-emerald-500" />;
-  if (type === 'Carton Jaune') return <RectangleVertical className="h-4 w-4 fill-amber-400 text-amber-400" />;
-  if (type === 'Carton Rouge' || type === 'Carton Jaune Rouge')
+  if (['But', 'GOAL', 'OWN_GOAL', 'PENALTY_GOAL'].includes(type)) return <Goal className="h-4 w-4 text-emerald-500" />;
+  if (type === 'Carton Jaune' || type === 'YELLOW') return <RectangleVertical className="h-4 w-4 fill-amber-400 text-amber-400" />;
+  if (['Carton Rouge', 'Carton Jaune Rouge', 'DIRECT_RED', 'SECOND_YELLOW_RED'].includes(type))
     return <RectangleVertical className="h-4 w-4 fill-red-500 text-red-500" />;
   return <span className="h-4 w-4 text-muted-foreground">•</span>;
 }
@@ -160,12 +170,12 @@ export default function ClubMatchDetail() {
           </span>
           <span className="inline-flex items-center gap-1.5">
             <MapPin className="h-3.5 w-3.5" />
-            {match.stade}
+            {match.stade}{match.venueCity ? `, ${match.venueCity}` : ''}
           </span>
-          {match.arbitrePrincipalId && (
+          {match.publishedOfficials && match.publishedOfficials.referees.length > 0 && (
             <span className="inline-flex items-center gap-1.5">
               <UserRound className="h-3.5 w-3.5" />
-              {match.arbitrePrincipalId.prenom} {match.arbitrePrincipalId.nom}
+              {match.publishedOfficials.referees.find((r) => r.role === 'MAIN')?.displayName}
             </span>
           )}
         </div>
@@ -186,7 +196,7 @@ export default function ClubMatchDetail() {
             ) : (
               <div className="relative space-y-0.5">
                 {sortedEvents.map((ev, i) => {
-                  const isHome = ev.equipe === 'home';
+                  const isHome = ev.clubId?._id === match.homeClubId._id || ev.equipe === 'home';
                   return (
                     <div
                       key={i}
@@ -214,6 +224,50 @@ export default function ClubMatchDetail() {
             )}
           </CardContent>
         </Card>
+
+        {/* ── Corps arbitral ─────────────────────────────────────────── */}
+        {match.publishedOfficials && match.publishedOfficials.referees.length > 0 && (
+          <Card className="lg:col-span-3">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Users className="h-4 w-4 text-blue-500" />
+                Corps arbitral désigné
+              </CardTitle>
+              {match.publishedOfficials.publishedAt && (
+                <CardDescription>
+                  Publié le{' '}
+                  {new Date(match.publishedOfficials.publishedAt).toLocaleDateString('fr-FR', {
+                    day: 'numeric', month: 'long', year: 'numeric',
+                  })}
+                </CardDescription>
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="divide-y">
+                {match.publishedOfficials.referees.map((ref, idx) => (
+                  <div key={idx} className="flex items-center justify-between py-2.5">
+                    <div className="flex items-center gap-2">
+                      <UserRound className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">{ref.displayName}</span>
+                      {ref.categorie && (
+                        <Badge variant="outline" className="text-xs">{ref.categorie}</Badge>
+                      )}
+                    </div>
+                    <Badge
+                      variant="secondary"
+                      className="text-xs"
+                    >
+                      {ref.role === 'MAIN' ? 'Arbitre Principal' :
+                        ref.role === 'ASSISTANT_1' ? 'Assistant 1' :
+                        ref.role === 'ASSISTANT_2' ? 'Assistant 2' :
+                        ref.role === 'FOURTH' ? '4e Arbitre' : ref.role}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* ── Indisponibilités du club ───────────────────────────────── */}
         <div className="space-y-6 lg:col-span-2">

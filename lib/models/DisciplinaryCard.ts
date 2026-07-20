@@ -35,6 +35,10 @@ export interface IDisciplinaryCard extends Document {
   accumulationStatus: CardAccumulationStatus;
   accumulationCount?: number;   // Count at the moment this card was recorded (1, 2, 3...)
   linkedSuspensionId?: mongoose.Types.ObjectId;
+  // Preserved (unindexed) when a reopen unsets `sourceEventId` from a
+  // cancelled card, so the historical link to its originating event is not lost.
+  previousSourceEventId?: mongoose.Types.ObjectId;
+  sourceEventId?: mongoose.Types.ObjectId;
   // Audit trail
   cancelledReason?: string;
   cancelledBy?: mongoose.Types.ObjectId;
@@ -68,6 +72,8 @@ const DisciplinaryCardSchema = new Schema<IDisciplinaryCard>(
     },
     accumulationCount: Number,
     linkedSuspensionId: { type: Schema.Types.ObjectId, ref: 'Suspension' },
+    previousSourceEventId: { type: Schema.Types.ObjectId, ref: 'MatchEvent' },
+    sourceEventId: { type: Schema.Types.ObjectId, ref: 'MatchEvent' },
     cancelledReason: String,
     cancelledBy: { type: Schema.Types.ObjectId, ref: 'User' },
     cancelledAt: Date,
@@ -83,6 +89,17 @@ DisciplinaryCardSchema.index({ joueurId: 1, saisonId: 1, accumulationStatus: 1 }
 DisciplinaryCardSchema.index({ matchId: 1 });
 DisciplinaryCardSchema.index({ clubId: 1, saisonId: 1 });
 DisciplinaryCardSchema.index({ organizationId: 1 });
+// Sparse+unique: enforces one live card per source event. On reopen, the
+// cancelled card's sourceEventId is unset (preserved as previousSourceEventId
+// instead — see match-correction.service.ts) so re-finalizing the same
+// canonical event can create a fresh card without an index collision against
+// its own cancelled history. (MongoDB partial-index filters don't support
+// $ne, so "only among non-cancelled cards" can't be expressed as a partial
+// filter — unsetting the field on cancellation is the supported equivalent.)
+DisciplinaryCardSchema.index(
+  { sourceEventId: 1 },
+  { unique: true, sparse: true }
+);
 
 const DisciplinaryCard: Model<IDisciplinaryCard> =
   mongoose.models.DisciplinaryCard ||

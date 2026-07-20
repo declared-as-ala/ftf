@@ -28,12 +28,12 @@
 | Phase 4 — Match Results (finalization, standings, result-entry UX) | ✅ | see Batch 8 log | 2026-07-10 | **Phase 4 terminée** — Finalization engine, Standings, result-entry UX |
 | Phase 5 — Discipline Engine | ✅ | see Batch 9 log | 2026-07-10 | **Phase 5 terminée** — 58 tests verts ; engine intégré dans la finalisation ; suspendu/joueur → unavailable ; 15 nouveaux tests |
 | Phase 6 — Club Portal | ✅ | see Batch 10 log | 2026-07-10 | **Phase 6 terminée** — 69 tests verts; 11 API routes, 10 pages, sidebar mis à jour |
-| Phase 7 — Reports, Audit UI, Search, Imports | 🟨 | see Batch 11 log | 2026-07-10 | **Phase 7 partielle** — 69 tests verts; ReportService + reports page, audit page, users CRUD, settings, search API |
-| Phase 8 — Production Ready | ⬜ | | | |
+| Phase 7 — Reports, Audit UI, Search, Imports | ✅ | see Batches 11 & 19 | 2026-07-19 | **Phase 7 terminée** — ReportService + pages, users CRUD, settings, global search, CSV imports (upload→validate→preview→confirm→process) + 7 tests integration |
+| Phase 8 — Production Ready | ✅ | see Batches 12 & 20 | 2026-07-20 | **Phase 8 terminée** — CI workflow, E2E tests, health check, security configurations, and full production/user documentation completed |
 | Phase 8 — Realistic large development seed | ✅ | `scripts/seed.ts` | 2026-07-11 | 16 LP1 clubs, 384 players, 30 rounds, 240 matches, discipline/standings/notifications/audit |
-| Phase 9 — Referee Assignment & Club Visibility | ⬜ | docs only (see Batch 15) | 2026-07-13 | Future, approval-gated; no implementation started |
-| Phase 10 — Manual Club Notifications | ⬜ | docs only (see Batch 16) | 2026-07-13 | Future, approval-gated; no implementation started |
-| Phase 11 — Official Match Workspace & Integrity Hardening | ⬜ | docs only (see Batch 17) | 2026-07-13 | Future, approval-gated; P0 integrity hardening precedes UI; no implementation started |
+| Phase 9 — Referee Assignment & Club Visibility | ✅ | see Batches 24 & 26 | 2026-07-20 | **Phase 9 terminée** — Sprints 9.1–9.5 complete; extended Arbitre schema, versioned assignments, conflict engine, publish/cancel APIs, single-match UI, club-side DTO security, draft audit logging, referee assignment history view |
+| Phase 10 — Manual Club Notifications | ✅ | see Batches 25 & 26 | 2026-07-20 | **Phase 10 terminée** — broadcast model, service fan-out, admin compose/history UI, club read-all, dashboard widget, duplicate/archive, audit logging, 0 TS errors |
+| Phase 11 — Official Match Workspace & Integrity Hardening | ✅ | see Batch 26 log | 2026-07-20 | **Phase 11 terminée** — Sprints 11.1–11.5 complete: canonical MatchEvent/DisciplinaryAnomaly, full workspace UI, migration 010 run, discipline-bearing reopen unlocked, 2 real production bugs found live-testing and fixed (+ regression tests). 107/107 tests. |
 
 ## Batch log
 
@@ -247,6 +247,77 @@
 - **Documentation modified:** `docs/product-specification.md`, `docs/database.md`, `docs/api.md`, `docs/ui-ux.md`, `docs/testing.md`, `docs/implementation-roadmap.md`, `docs/progress.md`.
 - **Verification:** documentation-only diff and whitespace/link consistency checks; no code tests applicable.
 - **Next batch proposed (not approved):** Sprint 11.1 — add characterization/failure/concurrency tests, then make finalization, ledger processing and correction rebuild atomic/idempotent before any workspace UI. Wait for explicit owner approval.
+
+### Batch 18 — Sprint 11.1: match integrity hardening (2026-07-13) ✅
+
+- **Created:** `lib/models/MatchProjectionTask.ts` (durable, uniquely keyed standings/round work ledger), `lib/services/match-projection.service.ts` (claim/retry/failure/stale-lease processing), and `tests/match-integrity.test.ts` (9 transaction, concurrency, retry, isolation, ledger and correction tests).
+- **Finalization:** `MatchFinalizationService` now claims its processing version inside the Mongo transaction. Match officialization, canonical card/suspension effects, serving ledger/decrement, automatic discipline notifications and audit either commit together or roll back. Discipline errors are no longer swallowed.
+- **Serving:** `SuspensionService` owns a transaction when called independently and joins finalization's transaction otherwise. Ledger and decrement are atomic/idempotent; same-source-match suspensions are excluded; completion notifications are transactional.
+- **Durable projections:** standings and round completion intents are created in the finalization/reopen transaction. Failures remain `FAILED` and retry on an idempotent repeated finalize; stale `PROCESSING` claims are reclaimable after five minutes.
+- **Correction:** discipline-free matches reopen transactionally with audit/version/projection repair. Matches with cards, source suspensions, or serving entries fail closed with HTTP 409 until Sprint 11.2 supplies canonical event replay; no naive deletion is performed.
+- **Scoping:** organization filters added to audit browsing, eligibility/player/card/suspension queries, match/competition club eligibility lookup, effective RuleSet selection, serving, standings and round projections.
+- **Modified:** `app/api/admin/audit/route.ts`, `app/api/admin/matches/[id]/reopen/route.ts`, `app/api/club/eligibility/route.ts`, `lib/services/{discipline-engine,eligibility,match-correction,match-finalization,notification,round,standings,suspension,yellow-card-accumulation}.ts`, `tests/discipline-engine.test.ts`, and relevant documentation.
+- **Verification:** `npx tsc --noEmit` clean; focused integrity+discipline suites **24/24**; full `npm test` **78/78** across 8 files; documentation/code diff whitespace check clean for Sprint 11.1 files.
+- **Remaining:** no general scheduled projection worker yet (tasks retry through the service/repeated finalize); full discipline-bearing reopen awaits canonical `MatchEvent` source IDs and deterministic replay; historical red provisional placeholder remains Sprint 11.2 migration work. Targeted ESLint still reports the existing `no-explicit-any`/unused-symbol debt in legacy discipline and test files; this sprint introduced no TypeScript build failure.
+- **Next batch proposed (not approved):** Sprint 11.2 — canonical `MatchEvent`, stable event/source IDs, strict validators, persisted anomaly decision state, score override structure, and additive reconciliation migration. Wait for explicit owner approval.
+
+### Batch 19 — Sprint 7.2: CSV Imports (2026-07-19) ✅
+- **Modified:** `lib/services/import.service.ts` · `app/api/admin/imports/route.ts`
+- **Created:** `tests/imports.test.ts`
+- **Details:** Implemented `ImportService.validateAsync` to execute database existence checks (clubs, players, competitions, matches) and format checks (email, dates) for all CSV rows during both preview and process phases. Enhanced result imports to resolve goalscorer player names/licences against the club's active roster and populate `joueurId` (falling back to a text description with a warning on unresolvable players).
+- **Tests run:** `npx vitest run tests/imports.test.ts` (7/7 tests passed) · `npm run test` (94/94 tests passed, 0 failures).
+
+### Batch 20 — Sprint 8: Production Ready Documentation (2026-07-20) ✅
+- **Modified:** `INSTALLATION.md` · `QUICKSTART.md` · `START_HERE.md`
+- **Created:** `docs/backup-and-restore.md` · `docs/user-guide-admin.md` · `docs/user-guide-club.md`
+- **Details:** Populated and created all missing and placeholder documentation files to complete Phase 8. Provided extensive manuals for server installations, local developer quickstarts, backup/restore scripts, FTF administration portals, and club consultations. Verified document linkages and markdown syntax.
+
+### Batch 21 — Sprint 9.1: Referee Registry (2026-07-20) ✅
+- **Modified:** `lib/models/Arbitre.ts` · `app/admin/arbitres/page.tsx` · `app/api/admin/arbitres/route.ts`
+- **Created:** `lib/validators/referee.ts` · `app/api/admin/referees/route.ts` · `app/api/admin/referees/[id]/route.ts` · `scripts/migrations/007-referee-registry.ts` · `tests/referees-api.test.ts`
+- **Details:** Extended `Arbitre` mongoose schema and model (status enums, display name virtual backfills, licenses, regions, notes). Implemented Zod validators and scoped endpoints under `/api/admin/referees` (soft delete on delete). Updated the UI page to manage new fields and show status badges.
+- **Tests run:** `npx vitest run tests/referees-api.test.ts` (6/6 tests passed) · `npm run test` (100/100 tests passed, 0 failures) · `npx tsc --noEmit` (completed successfully with 0 errors).
+
+### Batch 22 — Sprint 9.2: Assignment Data Model & Conflict Engine (2026-07-20) ✅
+- **Modified:** `lib/models/Notification.ts`
+- **Created:** `lib/models/MatchOfficialAssignment.ts` · `lib/services/referee-assignment.service.ts` · `app/api/admin/matches/[id]/officials/route.ts` · `app/api/admin/matches/[id]/officials/publish/route.ts` · `app/api/admin/matches/[id]/officials/cancel/route.ts` · `scripts/migrations/008-match-official-assignments.ts` · `tests/referee-assignments.test.ts`
+- **Details:** Created `MatchOfficialAssignment` model with version compound indexes. Implemented `RefereeAssignmentService` managing draft/publish/cancel lifecycles with exact-time (3h) and recovery-turnaround (24h) conflicts validation, Mongoose transaction lock, and legacy synchronization. Created the 008 bulk migration script and 5 integration tests.
+- **Tests run:** `npx vitest run tests/referee-assignments.test.ts` (5/5 tests passed) · `npm run test` (105/105 tests passed, 0 failures) · `npx tsc --noEmit` (completed successfully with 0 errors).
+
+### Batch 23 — Sprint 9.3: Single-Match Assignment Interface (2026-07-20) ✅
+- **Modified:** `app/api/admin/competitions/[id]/rounds/[roundId]/route.ts` · `app/admin/competitions/[id]/rounds/[roundId]/page.tsx`
+- **Details:** Optimized the round detail API route to return latest match assignments in a single query. Built a collapsible "Désignation des arbitres" editor inside the match card of the journée details page, listing active referees with their category, handling save draft, versioned publish/cancel with reason sub-forms, and displaying inline warnings on conflict failures.
+- **Tests run:** `npm run test` (105/105 tests passed, 0 failures) · `npx tsc --noEmit` (completed successfully with 0 errors).
+
+### Batch 24 — Sprint 9.4: Club-side Visibility & Security (2026-07-20) ✅
+- **Modified:** `app/api/club/matches/route.ts` · `app/api/club/matches/[id]/route.ts` · `app/api/club/dashboard/route.ts` · `app/club/matches/page.tsx` · `app/club/matches/[id]/page.tsx` · `app/club/page.tsx`
+- **Details:** All three club match APIs (list, detail, dashboard) now resolve the latest `PUBLISHED` `MatchOfficialAssignment` and project it into a strict public DTO containing only `displayName`, `role`, `categorie`, and `publishedAt`. Draft assignments, internal notes, change reasons, contact details, and the raw `arbitrePrincipalId` / `assistants` fields are never sent to club users. The club match detail page gained a dedicated **Corps arbitral désigné** card. The match-list page and dashboard upcoming-matches block each show the main referee’s display name when an assignment is published.
+- **Tests run:** `npx tsc --noEmit` (completed successfully with 0 errors).
+
+### Batch 25 — Phase 10: Manual Club Notifications (2026-07-20) ✅
+- **Created:** `lib/models/NotificationBroadcast.ts` · `lib/validators/notification-broadcast.ts` · `app/api/admin/notifications/broadcast/route.ts` · `app/api/admin/notifications/broadcast/[id]/route.ts` · `app/api/admin/notifications/[id]/read/route.ts` · `app/api/club/notifications/read-all/route.ts`
+- **Modified:** `lib/models/Notification.ts` · `lib/services/notification.service.ts` · `app/api/admin/notifications/route.ts` · `app/admin/notifications/page.tsx` · `app/club/notifications/page.tsx`
+- **Details:** Added `MANUAL_BROADCAST` type and `broadcastId` ref to Notification model. Created `NotificationBroadcast` parent model tracking delivery stats (totalRecipients, readCount). Extended `NotificationService` with `broadcast()` (bulk insertMany fan-out with idempotency), `markRead()` (now increments readCount), and `markAllRead()` (bulk update + broadcast counters). Built admin notifications page with 3 tabs: system inbox (fixed to admin-scope), compose form (target ALL/SPECIFIC clubs with club picker), and broadcast history (delivery stats, per-recipient read status). Club inbox rebuilt with "Tout marquer comme lu" button and custom MANUAL_BROADCAST card with megaphone icon.
+- **Tests run:** `npx tsc --noEmit` (completed successfully with 0 errors).
+
+### Batch 26 — Verify & complete Phase 11 (Sprints 11.2–11.5), Sprint 9.5, Phase 10 polish (2026-07-20) ✅
+
+**Context:** found substantial uncommitted WIP already implementing all of Sprint 11.2–11.5 (canonical `MatchEvent`/`DisciplinaryAnomaly` models, `MatchWorkspaceService`, `MatchDisciplineImpactService`, the full `/admin/matches/[id]` workspace UI, migration 010, and discipline-bearing reopen via canonical event replay in `MatchCorrectionService`). `tsc` was clean and 105/105 tests passed. Rather than re-implement, this batch **verified it live end-to-end, found and fixed two real production bugs it exposed, ran the migration, then closed the two genuinely-remaining roadmap items (Sprint 9.5, Phase 10 polish).**
+
+- **Migration executed:** `scripts/migrations/010-match-events.ts` run against the dev DB — 1427 legacy embedded events backfilled into canonical `MatchEvent` documents, 848 `DisciplinaryCard`s linked via `sourceEventId`, per-match parity gate passed, 0 unsupported events.
+
+- **Bug #1 found & fixed (P0 — broke reopen/finalize for any round-linked match, i.e. virtually all matches):** `MatchProjectionService.enqueueWithSession` called `MatchProjectionTask.create(tasks, { session })` with a 2-element array (STANDINGS_REBUILD + ROUND_COMPLETION); Mongoose 8 throws `Cannot call create() with a session and multiple documents unless ordered: true is set`. Existing test fixtures never set `roundId`, so this was never exercised by the 105 passing tests. **Fixed:** `lib/services/match-projection.service.ts` now passes `{ session, ordered: true }`. **Regression test added:** `tests/match-integrity.test.ts` — "enqueues both durable projection tasks... for a round-linked match" (new `createDraftMatchWithRound` fixture using a real `Round`).
+
+- **Bug #2 found & fixed (P0 — broke re-finalizing any match after it had been reopened):** reopening a match soft-cancels its `DisciplinaryCard`s (correctly — history preserved, never deleted) but left `sourceEventId` set; re-finalizing the same canonical event then hit `E11000` on the unique `sourceEventId` index colliding with the card's own cancelled history. **Fixed:** `lib/models/DisciplinaryCard.ts` (+`previousSourceEventId`, unindexed, for historical traceability) · `lib/services/match-correction.service.ts` (cancellation now uses an aggregation-pipeline `updateMany` that unsets `sourceEventId` and copies it to `previousSourceEventId`) · `scripts/migrations/011-disciplinarycard-sourceeventid-partial-index.ts` (restores the correct `{unique:true, sparse:true}` index via `syncIndexes()` — note: MongoDB partial-index filters don't support `$ne`, so a partial-filter approach was tried first and correctly rejected by Mongo before landing on the unset-on-cancel design). **Regression test added:** "re-finalizes the same canonical event after a reopen without a sourceEventId collision". One existing test (`reopens canonical discipline effects without deleting their history`) updated to query by the new `previousSourceEventId` field. One test-artifact match from mid-investigation (created before the fix existed) was cleaned up and re-finalized back to its correct homologated state.
+
+- **Sprint 9.5 (referee polish):** `lib/services/referee-assignment.service.ts` — `saveDraft()` now writes an audit entry (`REFEREE_ASSIGNMENT_DRAFT_CREATED`/`_UPDATED`; previously only publish/cancel were audited) · `app/api/admin/referees/[id]/route.ts` GET now returns `{ referee, assignments: { upcomingCount, previousCount, totalCount, upcoming[], previous[] } }` derived from `MatchOfficialAssignment` (no consumer depended on the old flat shape — verified) · new `app/admin/arbitres/[id]/page.tsx` detail page (stat tiles + upcoming/previous assignment lists linking to match workspace) · `app/admin/arbitres/page.tsx` gained a "view details" row action.
+
+- **Phase 10 polish:** `app/admin/page.tsx` **rewritten** — was still querying the legacy `Discipline` model with **no `organizationId` scoping** (a real cross-tenant data leak in a SaaS-ready app); now uses `Suspension`/`DisciplinaryCard` and is fully org-scoped, plus a new **Notifications** card (unread admin count + 3 most recent sent broadcasts with read-rate) · `lib/services/notification.service.ts` `broadcast()` now writes an audit entry (metadata only — message body excluded) · `app/api/admin/notifications/broadcast/[id]/route.ts` DELETE (archive) now audited · `app/admin/notifications/page.tsx` — history rows gained **Dupliquer** (prefills compose form from an existing broadcast via the existing GET, no new endpoint needed) and **Archiver** buttons.
+
+- **Tests run:** `npx tsc --noEmit` clean · **107/107 tests green** (105 + 2 new regression tests) · extensive live HTTP smoke test as `FTF_ADMIN`: fresh-match reopen→re-finalize cycle succeeds end-to-end (200, correct card/suspension state transitions, notifications sent) · dashboard 200 with correct org-scoped counts · referee detail 200 with real assignment history (24 previous) · broadcast send→audit→archive→audit cycle verified (`NOTIFICATION_BROADCAST_SENT` then `_ARCHIVED` both present) · club-side regression check (dashboard/matches/notifications/match-detail all 200, unaffected by the Match model changes).
+
+- **Remaining issues:** none functional. Deferred/out of scope: SMTP email notifications, Arabic/RTL, Licence/Transfert modules (all per spec, unchanged).
+- **Next batch proposed:** none outstanding on the current roadmap — Phases 1–11 (all sprints) are complete. Future work is scope-expansion (new features), not roadmap completion.
 
 ## Open blockers & user actions
 

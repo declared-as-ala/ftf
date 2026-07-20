@@ -4,7 +4,10 @@ export type ArbitreCategorie =
   | 'Élite'
   | 'Première Division'
   | 'Deuxième Division'
-  | 'Régional';
+  | 'Régional'
+  | 'ELITE'
+  | 'NATIONAL'
+  | 'REGIONAL';
 
 export interface IArbitre extends Document {
   organizationId?: mongoose.Types.ObjectId;
@@ -42,6 +45,11 @@ export interface IArbitre extends Document {
     notesMoyenne: number;
   };
   actif: boolean;
+  status: 'ACTIVE' | 'UNAVAILABLE' | 'SUSPENDED' | 'INACTIVE' | 'ARCHIVED';
+  displayName?: string;
+  licence?: string;
+  region?: string;
+  notes?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -51,6 +59,28 @@ const ArbitreSchema = new Schema<IArbitre>(
     organizationId: {
       type: Schema.Types.ObjectId,
       ref: 'Organization',
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ['ACTIVE', 'UNAVAILABLE', 'SUSPENDED', 'INACTIVE', 'ARCHIVED'],
+      default: 'ACTIVE',
+    },
+    displayName: {
+      type: String,
+      trim: true,
+    },
+    licence: {
+      type: String,
+      trim: true,
+    },
+    region: {
+      type: String,
+      trim: true,
+    },
+    notes: {
+      type: String,
+      trim: true,
     },
     nom: {
       type: String,
@@ -64,7 +94,7 @@ const ArbitreSchema = new Schema<IArbitre>(
     },
     categorie: {
       type: String,
-      enum: ['Élite', 'Première Division', 'Deuxième Division', 'Régional'],
+      enum: ['Élite', 'Première Division', 'Deuxième Division', 'Régional', 'ELITE', 'NATIONAL', 'REGIONAL'],
       required: true,
     },
     dateNaissance: {
@@ -133,6 +163,13 @@ const ArbitreSchema = new Schema<IArbitre>(
     timestamps: true,
   }
 );
+
+ArbitreSchema.pre('save', function (next) {
+  if (this.prenom && this.nom) {
+    this.displayName = `${this.prenom} ${this.nom}`.trim();
+  }
+  next();
+});
 
 const Arbitre: Model<IArbitre> = mongoose.models.Arbitre || mongoose.model<IArbitre>('Arbitre', ArbitreSchema);
 
