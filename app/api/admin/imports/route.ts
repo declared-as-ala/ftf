@@ -55,7 +55,8 @@ export async function POST(req: Request) {
     }
 
     const csvText = await file.text();
-    const { rows, headers } = validateCsv(csvText, entity);
+    const { rows: parsedRows, headers } = validateCsv(csvText, entity);
+    const rows = await ImportService.validateAsync(entity, parsedRows, orgId);
 
     if (mode === 'process') {
       const allow = formData.get('allow') === 'true';

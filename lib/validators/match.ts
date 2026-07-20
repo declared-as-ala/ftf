@@ -50,6 +50,17 @@ export const matchResultPatchSchema = z.object({
   scoreAway: z.coerce.number().int().min(0).max(99).optional(),
   statut: matchStatutSchema.optional(),
   notes: z.string().max(2000).optional(),
+  date: z.coerce.date().optional(),
+  stade: z.string().trim().min(1).max(200).optional(),
+  venueCity: z.string().trim().max(120).optional(),
+  arbitrePrincipalId: optionalObjectId,
+  assistants: z.array(objectIdSchema).max(4).optional(),
+  spectateurs: z.coerce.number().int().min(0).max(1000000).optional(),
+  expectedProcessingVersion: z.coerce.number().int().min(0).optional(),
+  scoreOverride: z.object({
+    reasonCode: z.enum(['FORFEIT', 'ADMINISTRATIVE_DECISION', 'LEGACY_IMPORT', 'FEDERATION_CORRECTION']),
+    explanation: z.string().trim().min(10).max(1000),
+  }).optional().nullable(),
 });
 
 export type MatchCreateInput = z.infer<typeof matchCreateSchema>;

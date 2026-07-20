@@ -35,7 +35,9 @@ export class MatchProjectionService {
       tasks.push({ ...common, type: 'ROUND_COMPLETION', roundId: input.roundId });
     }
 
-    await MatchProjectionTask.create(tasks, { session });
+    // Mongoose 8 requires `ordered` to be explicit when create() receives an
+    // array with a session — otherwise it throws even for a single-element array.
+    await MatchProjectionTask.create(tasks, { session, ordered: true });
   }
 
   static async processPendingForMatch(
