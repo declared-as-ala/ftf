@@ -17,6 +17,9 @@ import {
   Trophy,
   Circle,
   RefreshCw,
+  Users,
+  UserCheck,
+  UserX,
 } from 'lucide-react';
 
 interface Club {
@@ -81,6 +84,15 @@ export default function RoundDetailPage() {
   const [reopenMatchId, setReopenMatchId] = useState<string | null>(null);
   const [reopenReason, setReopenReason] = useState('');
 
+  // Referee management states
+  const [referees, setReferees] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<Record<string, any>>({});
+  const [expandedRefereeMatchId, setExpandedRefereeMatchId] = useState<string | null>(null);
+  const [refereeDrafts, setRefereeDrafts] = useState<Record<string, { main: string; assistant1: string; assistant2: string; fourth: string; notes: string; reason: string }>>({});
+  const [refereeErrors, setRefereeErrors] = useState<Record<string, string>>({});
+  const [refereeSuccess, setRefereeSuccess] = useState<Record<string, string>>({});
+  const [showReasonInput, setShowReasonInput] = useState<Record<string, 'publish' | 'cancel' | null>>({});
+
   const fetchData = async () => {
     setIsLoading(true);
     try {
@@ -106,6 +118,48 @@ export default function RoundDetailPage() {
         };
       }
       setDrafts(initialDrafts);
+
+      // Fetch active referees list
+      const refsRes = await fetch('/api/admin/referees?limit=100');
+      if (refsRes.ok) {
+        const refsData = await refsRes.json();
+        setReferees((refsData.referees || []).filter((r: any) => r.status !== 'ARCHIVED'));
+      }
+
+      // Latest assignments mapped by matchId
+      const latestAss = data.latestAssignments || {};
+      setAssignments(latestAss);
+
+      // Seed refereeDrafts state
+      const initialRefereeDrafts: typeof refereeDrafts = {};
+      for (const m of ms) {
+        const ass = latestAss[m._id];
+        if (ass) {
+          const mainRef = ass.referees.find((r: any) => r.role === 'MAIN')?.refereeId?._id || '';
+          const assistant1 = ass.referees.find((r: any) => r.role === 'ASSISTANT_1')?.refereeId?._id || '';
+          const assistant2 = ass.referees.find((r: any) => r.role === 'ASSISTANT_2')?.refereeId?._id || '';
+          const fourth = ass.referees.find((r: any) => r.role === 'FOURTH_OFFICIAL')?.refereeId?._id || '';
+          initialRefereeDrafts[m._id] = {
+            main: mainRef,
+            assistant1,
+            assistant2,
+            fourth,
+            notes: ass.notes || '',
+            reason: '',
+          };
+        } else {
+          initialRefereeDrafts[m._id] = {
+            main: '',
+            assistant1: '',
+            assistant2: '',
+            fourth: '',
+            notes: '',
+            reason: '',
+          };
+        }
+      }
+      setRefereeDrafts(initialRefereeDrafts);
+
     } catch (err) {
       console.error(err);
     } finally {
@@ -122,7 +176,6 @@ export default function RoundDetailPage() {
       ...prev,
       [matchId]: { ...prev[matchId], [field]: value },
     }));
-    // Clear any error for this match
     setErrors((prev) => {
       const copy = { ...prev };
       delete copy[matchId];
@@ -139,12 +192,11 @@ export default function RoundDetailPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          saisonId: matches.find(m => m._id === matchId) ? undefined : undefined,
+          saisonId: undefined,
           scoreHome: Number(d.scoreHome),
           scoreAway: Number(d.scoreAway),
           statut: d.notes !== (matches.find(m => m._id === matchId)?.notes || '') ? 'Brouillon' : (d.statut === 'Programmé' && (Number(d.scoreHome) > 0 || Number(d.scoreAway) > 0) ? 'Brouillon' : d.statut),
           notes: d.notes,
-          // required by existing validator
           ...(matches.find(m => m._id === matchId) && {
             saisonId: (matches.find(m => m._id === matchId) as any).saisonId || undefined,
             competitionId: competitionId,
@@ -174,7 +226,6 @@ export default function RoundDetailPage() {
     setFinalizingMatchId(matchId);
     setErrors((prev) => { const c = { ...prev }; delete c[matchId]; return c; });
     try {
-      // Save draft first
       await handleSaveDraft(matchId);
 
       const res = await fetch(`/api/admin/matches/${matchId}/finalize`, {
@@ -233,6 +284,110 @@ export default function RoundDetailPage() {
       }
     } catch {
       setErrors(prev => ({ ...prev, [matchId]: 'Erreur réseau' }));
+    }
+  };
+
+  // Referee assignment event handlers
+  const handleRefereeDraftChange = (matchId: string, field: string, value: string) => {
+    setRefereeDrafts((prev) => ({
+      ...prev,
+      [matchId]: { ...prev[matchId], [field]: value },
+    }));
+    setRefereeErrors((prev) => { const copy = { ...prev }; delete copy[matchId]; return copy; });
+    setRefereeSuccess((prev) => { const copy = { ...prev }; delete copy[matchId]; return copy; });
+  };
+
+  const handleSaveRefereeDraft = async (matchId: string) => {
+    setRefereeErrors((prev) => { const c = { ...prev }; delete c[matchId]; return c; });
+    setRefereeSuccess((prev) => { const c = { ...prev }; delete c[matchId]; return c; });
+    const draft = refereeDrafts[matchId];
+    if (!draft) return;
+
+    const refsList: any[] = [];
+    if (draft.main) refsList.push({ refereeId: draft.main, role: 'MAIN' });
+    if (draft.assistant1) refsList.push({ refereeId: draft.assistant1, role: 'ASSISTANT_1' });
+    if (draft.assistant2) refsList.push({ refereeId: draft.assistant2, role: 'ASSISTANT_2' });
+    if (draft.fourth) refsList.push({ refereeId: draft.fourth, role: 'FOURTH_OFFICIAL' });
+
+    try {
+      const res = await fetch(`/api/admin/matches/${matchId}/officials`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ referees: refsList, notes: draft.notes }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRefereeErrors((prev) => ({ ...prev, [matchId]: data.error || 'Erreur lors de la sauvegarde du brouillon' }));
+      } else {
+        setRefereeSuccess((prev) => ({ ...prev, [matchId]: 'Brouillon des arbitres enregistré !' }));
+        setTimeout(() => setRefereeSuccess((prev) => { const c = { ...prev }; delete c[matchId]; return c; }), 3000);
+        await fetchData();
+      }
+    } catch {
+      setRefereeErrors((prev) => ({ ...prev, [matchId]: 'Erreur réseau' }));
+    }
+  };
+
+  const handlePublishRefereeAssignment = async (matchId: string, version: number) => {
+    setRefereeErrors((prev) => { const c = { ...prev }; delete c[matchId]; return c; });
+    setRefereeSuccess((prev) => { const c = { ...prev }; delete c[matchId]; return c; });
+    const draft = refereeDrafts[matchId];
+    const isUpdate = assignments[matchId]?.status === 'PUBLISHED';
+
+    if (isUpdate && (!draft.reason || draft.reason.trim().length < 5)) {
+      setRefereeErrors((prev) => ({ ...prev, [matchId]: 'Un motif de modification (min. 5 caractères) est requis' }));
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/admin/matches/${matchId}/officials/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version, reason: draft.reason }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRefereeErrors((prev) => ({ ...prev, [matchId]: data.error || 'Erreur lors de la publication' }));
+      } else {
+        setRefereeSuccess((prev) => ({ ...prev, [matchId]: 'Désignation publiée avec succès !' }));
+        setShowReasonInput((prev) => ({ ...prev, [matchId]: null }));
+        setRefereeDrafts((prev) => ({ ...prev, [matchId]: { ...prev[matchId], reason: '' } }));
+        setTimeout(() => setRefereeSuccess((prev) => { const c = { ...prev }; delete c[matchId]; return c; }), 3000);
+        await fetchData();
+      }
+    } catch {
+      setRefereeErrors((prev) => ({ ...prev, [matchId]: 'Erreur réseau' }));
+    }
+  };
+
+  const handleCancelRefereeAssignment = async (matchId: string, version: number) => {
+    setRefereeErrors((prev) => { const c = { ...prev }; delete c[matchId]; return c; });
+    setRefereeSuccess((prev) => { const c = { ...prev }; delete c[matchId]; return c; });
+    const draft = refereeDrafts[matchId];
+
+    if (!draft.reason || draft.reason.trim().length < 5) {
+      setRefereeErrors((prev) => ({ ...prev, [matchId]: 'Un motif d\'annulation (min. 5 caractères) est requis' }));
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/admin/matches/${matchId}/officials/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version, reason: draft.reason }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRefereeErrors((prev) => ({ ...prev, [matchId]: data.error || 'Erreur lors de l\'annulation' }));
+      } else {
+        setRefereeSuccess((prev) => ({ ...prev, [matchId]: 'Désignation annulée avec succès' }));
+        setShowReasonInput((prev) => ({ ...prev, [matchId]: null }));
+        setRefereeDrafts((prev) => ({ ...prev, [matchId]: { ...prev[matchId], reason: '' } }));
+        setTimeout(() => setRefereeSuccess((prev) => { const c = { ...prev }; delete c[matchId]; return c; }), 3000);
+        await fetchData();
+      }
+    } catch {
+      setRefereeErrors((prev) => ({ ...prev, [matchId]: 'Erreur réseau' }));
     }
   };
 
@@ -509,6 +664,225 @@ export default function RoundDetailPage() {
                       )}
                     </div>
                   )}
+
+                  {/* Referee Assignment Section */}
+                  <div className="border-t px-4 py-3 bg-slate-50 dark:bg-slate-900/20">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-semibold text-muted-foreground">Arbitres :</span>
+                        {assignments[match._id] ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium text-foreground">
+                              {assignments[match._id].referees.find((r: any) => r.role === 'MAIN')?.refereeId?.displayName || 
+                               `${assignments[match._id].referees.find((r: any) => r.role === 'MAIN')?.refereeId?.prenom || ''} ${assignments[match._id].referees.find((r: any) => r.role === 'MAIN')?.refereeId?.nom || ''}` || 'Non défini'}
+                            </span>
+                            <span className={`px-1.5 py-0.5 text-[10px] rounded font-semibold border ${
+                              assignments[match._id].status === 'PUBLISHED'
+                                ? 'bg-emerald-500/10 text-emerald-700 border-emerald-300 dark:text-emerald-400'
+                                : assignments[match._id].status === 'CANCELLED'
+                                ? 'bg-rose-500/10 text-rose-700 border-rose-300 dark:text-rose-400'
+                                : 'bg-amber-500/10 text-amber-700 border-amber-300 dark:text-amber-400'
+                            }`}>
+                              {assignments[match._id].status === 'PUBLISHED' ? 'Officiel' : assignments[match._id].status === 'CANCELLED' ? 'Annulé' : 'Brouillon'} (v{assignments[match._id].version})
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground italic">Non désigné</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setExpandedRefereeMatchId(expandedRefereeMatchId === match._id ? null : match._id)}
+                        className="text-xs text-primary hover:underline flex items-center gap-0.5"
+                      >
+                        {expandedRefereeMatchId === match._id ? 'Masquer' : 'Gérer les arbitres'}
+                      </button>
+                    </div>
+
+                    {expandedRefereeMatchId === match._id && (
+                      <div className="mt-4 pt-3 border-t border-dashed space-y-4">
+                        {refereeSuccess[match._id] && (
+                          <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs p-2 rounded flex items-center gap-1.5">
+                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                            {refereeSuccess[match._id]}
+                          </div>
+                        )}
+                        {refereeErrors[match._id] && (
+                          <div className="bg-destructive/10 border border-destructive/20 text-destructive text-xs p-2.5 rounded space-y-1.5">
+                            <div className="flex items-center gap-1.5 font-bold">
+                              <AlertCircle className="h-4 w-4 shrink-0" />
+                              <span>Attention : Conflit de désignation</span>
+                            </div>
+                            <p className="pl-5.5 font-medium">{refereeErrors[match._id]}</p>
+                            <p className="pl-5.5 text-[10px] text-muted-foreground">Action corrective : Veuillez assigner un autre arbitre disponible ou modifier les horaires de rencontre.</p>
+                          </div>
+                        )}
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Arbitre Principal (MAIN)</label>
+                            <select
+                              value={refereeDrafts[match._id]?.main || ''}
+                              onChange={(e) => handleRefereeDraftChange(match._id, 'main', e.target.value)}
+                              className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 focus:outline-none focus:ring-1 focus:ring-ring"
+                            >
+                              <option value="">— Sélectionner —</option>
+                              {referees.map((r) => (
+                                <option key={r._id} value={r._id}>{r.displayName || `${r.prenom} ${r.nom}`} ({r.categorie})</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Premier Assistant (ASSISTANT_1)</label>
+                            <select
+                              value={refereeDrafts[match._id]?.assistant1 || ''}
+                              onChange={(e) => handleRefereeDraftChange(match._id, 'assistant1', e.target.value)}
+                              className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 focus:outline-none focus:ring-1 focus:ring-ring"
+                            >
+                              <option value="">— Aucun —</option>
+                              {referees.map((r) => (
+                                <option key={r._id} value={r._id}>{r.displayName || `${r.prenom} ${r.nom}`} ({r.categorie})</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Deuxième Assistant (ASSISTANT_2)</label>
+                            <select
+                              value={refereeDrafts[match._id]?.assistant2 || ''}
+                              onChange={(e) => handleRefereeDraftChange(match._id, 'assistant2', e.target.value)}
+                              className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 focus:outline-none focus:ring-1 focus:ring-ring"
+                            >
+                              <option value="">— Aucun —</option>
+                              {referees.map((r) => (
+                                <option key={r._id} value={r._id}>{r.displayName || `${r.prenom} ${r.nom}`} ({r.categorie})</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Quatrième Officiel (FOURTH_OFFICIAL)</label>
+                            <select
+                              value={refereeDrafts[match._id]?.fourth || ''}
+                              onChange={(e) => handleRefereeDraftChange(match._id, 'fourth', e.target.value)}
+                              className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 focus:outline-none focus:ring-1 focus:ring-ring"
+                            >
+                              <option value="">— Aucun —</option>
+                              {referees.map((r) => (
+                                <option key={r._id} value={r._id}>{r.displayName || `${r.prenom} ${r.nom}`} ({r.categorie})</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Notes / Remarques internes</label>
+                          <input
+                            type="text"
+                            placeholder="Notes d'affectation..."
+                            value={refereeDrafts[match._id]?.notes || ''}
+                            onChange={(e) => handleRefereeDraftChange(match._id, 'notes', e.target.value)}
+                            className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 focus:outline-none focus:ring-1 focus:ring-ring"
+                          />
+                        </div>
+
+                        {/* Motif sub-form wrapper */}
+                        {showReasonInput[match._id] && (
+                          <div className="bg-muted/50 p-3 rounded-md border space-y-2">
+                            <label className="text-[10px] font-bold text-foreground flex items-center gap-1">
+                              <span>
+                                {showReasonInput[match._id] === 'publish'
+                                  ? 'Motif de modification de la désignation officielle'
+                                  : 'Motif d\'annulation de la désignation officielle'
+                                }
+                              </span>
+                              <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Indiquer la raison (changement de planning, blessure, etc.)..."
+                              value={refereeDrafts[match._id]?.reason || ''}
+                              onChange={(e) => handleRefereeDraftChange(match._id, 'reason', e.target.value)}
+                              className="w-full text-xs h-9 rounded-md border border-input bg-background px-3 focus:outline-none focus:ring-1 focus:ring-ring"
+                              id={`referee-reason-${match._id}`}
+                            />
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => {
+                                  setShowReasonInput((prev) => ({ ...prev, [match._id]: null }));
+                                  handleRefereeDraftChange(match._id, 'reason', '');
+                                }}
+                                className="px-2.5 py-1 text-[11px] font-medium border rounded hover:bg-accent"
+                              >
+                                Retour
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (showReasonInput[match._id] === 'publish') {
+                                    handlePublishRefereeAssignment(match._id, assignments[match._id]?.version || 1);
+                                  } else {
+                                    handleCancelRefereeAssignment(match._id, assignments[match._id]?.version || 1);
+                                  }
+                                }}
+                                id={`submit-referee-action-${match._id}`}
+                                className={`px-2.5 py-1 text-[11px] font-semibold text-white rounded ${
+                                  showReasonInput[match._id] === 'publish'
+                                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                                    : 'bg-rose-600 hover:bg-rose-700'
+                                }`}
+                              >
+                                Valider
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {!showReasonInput[match._id] && (
+                          <div className="flex items-center justify-end gap-2 pt-2">
+                            <button
+                              onClick={() => handleSaveRefereeDraft(match._id)}
+                              id={`save-referee-draft-${match._id}`}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold border rounded-md hover:bg-accent transition-colors"
+                            >
+                              <Save className="h-3.5 w-3.5" />
+                              Enregistrer Brouillon
+                            </button>
+
+                            {assignments[match._id]?.status === 'PUBLISHED' ? (
+                              <>
+                                <button
+                                  onClick={() => setShowReasonInput((prev) => ({ ...prev, [match._id]: 'publish' }))}
+                                  id={`modify-referee-${match._id}`}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
+                                >
+                                  <Zap className="h-3.5 w-3.5" />
+                                  Modifier & Publier
+                                </button>
+                                <button
+                                  onClick={() => setShowReasonInput((prev) => ({ ...prev, [match._id]: 'cancel' }))}
+                                  id={`cancel-referee-${match._id}`}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-rose-600 rounded-md hover:bg-rose-700 transition-colors"
+                                >
+                                  <UserX className="h-3.5 w-3.5" />
+                                  Annuler Désignation
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => handlePublishRefereeAssignment(match._id, assignments[match._id]?.version || 1)}
+                                id={`publish-referee-${match._id}`}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-md hover:bg-emerald-700 transition-colors"
+                              >
+                                <UserCheck className="h-3.5 w-3.5" />
+                                Publier Désignation
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             );

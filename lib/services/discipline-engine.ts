@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import DisciplinaryRuleSet from '../models/DisciplinaryRuleSet';
 import { YellowCardAccumulationService } from './yellow-card-accumulation.service';
 import type { IEvenementMatch } from '../models/Match';
+import type { IMatchEvent } from '../models/MatchEvent';
 
 /**
  * DisciplineEngine — orchestrator called INSIDE the finalization transaction.
@@ -25,6 +26,7 @@ export class DisciplineEngine {
       awayClubId: any;
       date?: Date;
       evenements: IEvenementMatch[];
+      canonicalEvents?: IMatchEvent[];
     },
     session: mongoose.ClientSession
   ) {
@@ -82,7 +84,17 @@ export class DisciplineEngine {
       suspensionId?: string;
     }[] = [];
 
-    for (const evt of match.evenements) {
+    const sourceEvents: any[] = match.canonicalEvents?.length
+      ? match.canonicalEvents.map((event) => ({
+          _id: event._id,
+          type: event.type === 'YELLOW' ? 'Carton Jaune' : event.type === 'SECOND_YELLOW_RED' ? 'Carton Jaune Rouge' : event.type === 'DIRECT_RED' ? 'Carton Rouge' : 'Autre',
+          minute: event.minute,
+          joueurId: event.playerId,
+          equipe: event.clubId.toString() === match.homeClubId.toString() ? 'home' : 'away',
+        }))
+      : match.evenements;
+
+    for (const evt of sourceEvents) {
       if (!evt.joueurId) continue;
 
       const joueurIdStr = evt.joueurId.toString();
@@ -106,6 +118,7 @@ export class DisciplineEngine {
             ruleSetSuspensionMatches: suspensionMatches,
             ruleSetScope: scope,
             matchIsOfficial,
+            sourceEventId: evt._id,
           },
           session
         );
@@ -129,6 +142,7 @@ export class DisciplineEngine {
             cardType,
             minute: evt.minute,
             matchIsOfficial,
+            sourceEventId: evt._id,
           },
           session
         );
