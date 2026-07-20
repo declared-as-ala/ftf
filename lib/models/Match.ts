@@ -33,6 +33,7 @@ export interface IMatch extends Document {
   awayClubId: mongoose.Types.ObjectId;
   date: Date;
   stade: string;
+  venueCity?: string;
   // Scores
   scoreHome: number;
   scoreAway: number;
@@ -44,6 +45,12 @@ export interface IMatch extends Document {
   validePar?: mongoose.Types.ObjectId;
   dateValidation?: Date;
   processingVersion: number;        // Monotonically incremented to prevent concurrent finalization
+  scoreOverride?: {
+    reasonCode: 'FORFEIT' | 'ADMINISTRATIVE_DECISION' | 'LEGACY_IMPORT' | 'FEDERATION_CORRECTION';
+    explanation: string;
+    authorizedBy: mongoose.Types.ObjectId;
+    authorizedAt: Date;
+  };
   reopenReason?: string;
   reopenedBy?: mongoose.Types.ObjectId;
   reopenedAt?: Date;
@@ -115,6 +122,7 @@ const MatchSchema = new Schema<IMatch>(
       type: String,
       required: true,
     },
+    venueCity: { type: String, trim: true, maxlength: 120 },
     scoreHome: {
       type: Number,
       default: 0,
@@ -144,6 +152,15 @@ const MatchSchema = new Schema<IMatch>(
     processingVersion: {
       type: Number,
       default: 0,
+    },
+    scoreOverride: {
+      reasonCode: {
+        type: String,
+        enum: ['FORFEIT', 'ADMINISTRATIVE_DECISION', 'LEGACY_IMPORT', 'FEDERATION_CORRECTION'],
+      },
+      explanation: { type: String, trim: true, maxlength: 1000 },
+      authorizedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+      authorizedAt: Date,
     },
     reopenReason: String,
     reopenedBy: {

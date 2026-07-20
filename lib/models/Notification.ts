@@ -10,11 +10,16 @@ export type NotificationType =
   | 'ANOMALY_DETECTED'
   | 'STANDINGS_UPDATED'
   | 'MATCH_FINALIZED'
-  | 'MATCH_REOPENED';
+  | 'MATCH_REOPENED'
+  | 'REFEREE_ASSIGNMENT_PUBLISHED'
+  | 'REFEREE_ASSIGNMENT_UPDATED'
+  | 'REFEREE_ASSIGNMENT_CANCELLED'
+  | 'MANUAL_BROADCAST';
 
 export interface INotification extends Document {
   organizationId: mongoose.Types.ObjectId;
   recipientClubId?: mongoose.Types.ObjectId;  // null = admin-only notification
+  broadcastId?: mongoose.Types.ObjectId;       // parent NotificationBroadcast (manual only)
   type: NotificationType;
   subject: string;
   body: string;
@@ -30,6 +35,7 @@ const NotificationSchema = new Schema<INotification>(
   {
     organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
     recipientClubId: { type: Schema.Types.ObjectId, ref: 'Club' },
+    broadcastId: { type: Schema.Types.ObjectId, ref: 'NotificationBroadcast' },
     type: {
       type: String,
       enum: [
@@ -43,6 +49,10 @@ const NotificationSchema = new Schema<INotification>(
         'STANDINGS_UPDATED',
         'MATCH_FINALIZED',
         'MATCH_REOPENED',
+        'REFEREE_ASSIGNMENT_PUBLISHED',
+        'REFEREE_ASSIGNMENT_UPDATED',
+        'REFEREE_ASSIGNMENT_CANCELLED',
+        'MANUAL_BROADCAST',
       ],
       required: true,
     },

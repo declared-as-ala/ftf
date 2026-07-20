@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
-import { Flag, Plus, Pencil, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { Flag, Plus, Pencil, Trash2, User, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FullPageLoader, InlineLoader } from '@/components/Loader';
 import { LoadingButton } from '@/components/LoadingButton';
+
 import {
   Table,
   TableBody,
@@ -19,7 +20,8 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 
-type ArbitreCategorie = 'Élite' | 'Première Division' | 'Deuxième Division' | 'Régional';
+type ArbitreCategorie = 'Élite' | 'Première Division' | 'Deuxième Division' | 'Régional' | 'ELITE' | 'NATIONAL' | 'REGIONAL';
+type ArbitreStatus = 'ACTIVE' | 'UNAVAILABLE' | 'SUSPENDED' | 'INACTIVE' | 'ARCHIVED';
 
 interface ArbitreDto {
   _id: string;
@@ -28,11 +30,13 @@ interface ArbitreDto {
   categorie: ArbitreCategorie;
   dateNaissance: string;
   nationalite: string;
-  photo?: string;
   email?: string;
   telephone?: string;
   ville: string;
-  actif: boolean;
+  status: ArbitreStatus;
+  licence?: string;
+  region?: string;
+  notes?: string;
 }
 
 export default function AdminArbitresPage() {
@@ -53,19 +57,21 @@ export default function AdminArbitresPage() {
   const [ville, setVille] = useState('');
   const [email, setEmail] = useState('');
   const [telephone, setTelephone] = useState('');
-  const [actif, setActif] = useState(true);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [status, setStatus] = useState<ArbitreStatus>('ACTIVE');
+  const [licence, setLicence] = useState('');
+  const [region, setRegion] = useState('');
+  const [notes, setNotes] = useState('');
 
   useEffect(() => {
     const fetchArbitres = async () => {
       try {
         setLoading(true);
-        const res = await fetch('/api/admin/arbitres', { cache: 'no-store' });
+        const res = await fetch('/api/admin/referees?limit=100', { cache: 'no-store' });
         if (!res.ok) {
           throw new Error('Erreur lors du chargement des arbitres');
         }
         const data = await res.json();
-        setArbitres(data);
+        setArbitres(data.referees || []);
       } catch (e: any) {
         setError(e.message || 'Erreur inconnue');
       } finally {
@@ -86,8 +92,10 @@ export default function AdminArbitresPage() {
     setVille('');
     setEmail('');
     setTelephone('');
-    setActif(true);
-    setPhotoFile(null);
+    setStatus('ACTIVE');
+    setLicence('');
+    setRegion('');
+    setNotes('');
   };
 
   const openCreateForm = () => {
@@ -110,8 +118,10 @@ export default function AdminArbitresPage() {
     setVille(a.ville);
     setEmail(a.email || '');
     setTelephone(a.telephone || '');
-    setActif(a.actif);
-    setPhotoFile(null);
+    setStatus(a.status || 'ACTIVE');
+    setLicence(a.licence || '');
+    setRegion(a.region || '');
+    setNotes(a.notes || '');
     setFormOpen(true);
   };
 
@@ -122,29 +132,27 @@ export default function AdminArbitresPage() {
     setSuccess(null);
 
     try {
-      const formData = new FormData();
-      formData.append('nom', nom);
-      formData.append('prenom', prenom);
-      formData.append('categorie', categorie);
-      formData.append('dateNaissance', dateNaissance);
-      formData.append('nationalite', nationalite);
-      formData.append('ville', ville);
-      formData.append('email', email);
-      formData.append('telephone', telephone);
-      formData.append('actif', actif ? 'true' : 'false');
-
-      if (photoFile) {
-        formData.append('photo', photoFile);
-      }
-
       const isEdit = !!editing;
-      if (isEdit && editing) {
-        formData.append('id', editing._id);
-      }
+      const url = isEdit && editing ? `/api/admin/referees/${editing._id}` : '/api/admin/referees';
+      const method = isEdit ? 'PUT' : 'POST';
 
-      const res = await fetch('/api/admin/arbitres', {
-        method: isEdit ? 'PUT' : 'POST',
-        body: formData,
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nom,
+          prenom,
+          categorie,
+          dateNaissance,
+          nationalite,
+          ville,
+          email: email || undefined,
+          telephone: telephone || undefined,
+          status,
+          licence: licence || undefined,
+          region: region || undefined,
+          notes: notes || undefined,
+        }),
       });
 
       if (!res.ok) {
@@ -172,7 +180,7 @@ export default function AdminArbitresPage() {
   };
 
   const handleDelete = async (arbitre: ArbitreDto) => {
-    if (!window.confirm(`Supprimer l'arbitre "${arbitre.prenom} ${arbitre.nom}" ?`)) {
+    if (!window.confirm(`Archiver l'arbitre "${arbitre.prenom} ${arbitre.nom}" ?`)) {
       return;
     }
 
@@ -180,19 +188,28 @@ export default function AdminArbitresPage() {
       setError(null);
       setSuccess(null);
 
-      const res = await fetch(`/api/admin/arbitres?id=${arbitre._id}`, {
+      const res = await fetch(`/api/admin/referees/${arbitre._id}`, {
         method: 'DELETE',
       });
 
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        throw new Error(data?.error || 'Erreur lors de la suppression de l’arbitre');
+        throw new Error(data?.error || 'Erreur lors de l’archivage de l’arbitre');
       }
 
       setArbitres((prev) => prev.filter((a) => a._id !== arbitre._id));
-      setSuccess('Arbitre supprimé avec succès');
+      setSuccess('Arbitre archivé avec succès');
     } catch (e: any) {
       setError(e.message || 'Erreur inconnue');
+    }
+  };
+
+  const translateCategory = (cat: ArbitreCategorie) => {
+    switch (cat) {
+      case 'ELITE': return 'Élite';
+      case 'NATIONAL': return 'Niveau National';
+      case 'REGIONAL': return 'Niveau Régional';
+      default: return cat;
     }
   };
 
@@ -205,8 +222,7 @@ export default function AdminArbitresPage() {
             Gestion des Arbitres
           </h1>
           <p className="text-muted-foreground mt-2">
-            Ajoutez, modifiez et supprimez les arbitres officiels. Vous pouvez également
-            téléverser une photo pour chacun.
+            Ajoutez, modifiez et gérez le registre des arbitres officiels de la fédération.
           </p>
         </div>
 
@@ -269,17 +285,14 @@ export default function AdminArbitresPage() {
                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     value={categorie}
                     onChange={(e) =>
-                      setCategorie(
-                        e.target.value as 'Élite' | 'Première Division' | 'Deuxième Division' | 'Régional' | ''
-                      )
+                      setCategorie(e.target.value as ArbitreCategorie)
                     }
                     required
                   >
                     <option value="">Sélectionner</option>
-                    <option value="Élite">Élite</option>
-                    <option value="Première Division">Première Division</option>
-                    <option value="Deuxième Division">Deuxième Division</option>
-                    <option value="Régional">Régional</option>
+                    <option value="ELITE">Élite (ELITE)</option>
+                    <option value="NATIONAL">National (NATIONAL)</option>
+                    <option value="REGIONAL">Régional (REGIONAL)</option>
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -332,44 +345,52 @@ export default function AdminArbitresPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <input
-                  id="actif"
-                  type="checkbox"
-                  checked={actif}
-                  onChange={(e) => setActif(e.target.checked)}
-                  className="h-4 w-4 rounded border-input"
-                />
-                <Label htmlFor="actif" className="cursor-pointer">
-                  Actif
-                </Label>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="licence">Code / N° Licence</Label>
+                  <Input
+                    id="licence"
+                    value={licence}
+                    onChange={(e) => setLicence(e.target.value)}
+                    placeholder="Ex: LIC-998822"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="region">Région (Ligue)</Label>
+                  <Input
+                    id="region"
+                    value={region}
+                    onChange={(e) => setRegion(e.target.value)}
+                    placeholder="Ex: Tunis, Sousse..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Statut Disciplinaire</Label>
+                  <select
+                    id="status"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as ArbitreStatus)}
+                    required
+                  >
+                    <option value="ACTIVE">Actif (ACTIVE)</option>
+                    <option value="UNAVAILABLE">Indisponible (UNAVAILABLE)</option>
+                    <option value="SUSPENDED">Suspendu (SUSPENDED)</option>
+                    <option value="INACTIVE">Inactif (INACTIVE)</option>
+                  </select>
+                </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="photo">Photo de l’arbitre</Label>
-                <Input
-                  id="photo"
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    setPhotoFile(file ?? null);
-                  }}
+                <Label htmlFor="notes">Notes / Observations</Label>
+                <textarea
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Notes facultatives concernant l'arbitre..."
+                  className="min-h-24 w-full rounded-md border bg-background p-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  rows={3}
                 />
-                {editing?.photo && !photoFile && (
-                  <p className="text-xs text-muted-foreground">
-                    Photo actuelle :
-                    <span className="inline-flex items-center gap-2 ml-2">
-                      <Image
-                        src={editing.photo}
-                        alt={`${editing.prenom} ${editing.nom}`}
-                        width={32}
-                        height={32}
-                        className="rounded-full border bg-white object-cover"
-                      />
-                    </span>
-                  </p>
-                )}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2">
@@ -399,7 +420,7 @@ export default function AdminArbitresPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Liste des arbitres</CardTitle>
+          <CardTitle>Registre des Arbitres</CardTitle>
           <CardDescription>
             {loading ? (
               <span className="flex items-center gap-2">
@@ -426,11 +447,11 @@ export default function AdminArbitresPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Photo</TableHead>
+                    <TableHead>Avatar</TableHead>
+                    <TableHead>Licence / Code</TableHead>
                     <TableHead>Nom</TableHead>
                     <TableHead>Catégorie</TableHead>
-                    <TableHead>Nationalité</TableHead>
-                    <TableHead>Ville</TableHead>
+                    <TableHead>Région / Ville</TableHead>
                     <TableHead>Statut</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -439,43 +460,49 @@ export default function AdminArbitresPage() {
                   {arbitres.map((a) => (
                     <TableRow key={a._id}>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          {a.photo ? (
-                            <Image
-                              src={a.photo}
-                              alt={`${a.prenom} ${a.nom}`}
-                              width={32}
-                              height={32}
-                              className="rounded-full border bg-white object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full border bg-muted text-xs">
-                              {a.prenom.charAt(0).toUpperCase()}
-                              {a.nom.charAt(0).toUpperCase()}
-                            </div>
-                          )}
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full border bg-muted text-xs text-muted-foreground">
+                          <User className="h-4 w-4" />
                         </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {a.licence || 'N/A'}
                       </TableCell>
                       <TableCell className="font-medium">
                         {a.prenom} {a.nom}
                       </TableCell>
-                      <TableCell>{a.categorie}</TableCell>
-                      <TableCell>{a.nationalite}</TableCell>
-                      <TableCell>{a.ville}</TableCell>
+                      <TableCell>{translateCategory(a.categorie)}</TableCell>
+                      <TableCell>
+                        {a.region ? `${a.region} (${a.ville})` : a.ville}
+                      </TableCell>
                       <TableCell>
                         <span
                           className={cn(
                             'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium',
-                            a.actif
+                            a.status === 'ACTIVE'
                               ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                              : a.status === 'UNAVAILABLE'
+                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                              : a.status === 'SUSPENDED'
+                              ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
                               : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
                           )}
                         >
-                          {a.actif ? 'Actif' : 'Inactif'}
+                          {a.status === 'ACTIVE'
+                            ? 'Actif'
+                            : a.status === 'UNAVAILABLE'
+                            ? 'Indisponible'
+                            : a.status === 'SUSPENDED'
+                            ? 'Suspendu'
+                            : 'Inactif'}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
+                          <Button size="icon" variant="outline" asChild>
+                            <Link href={`/admin/arbitres/${a._id}`} aria-label="Voir les désignations">
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                          </Button>
                           <Button size="icon" variant="outline" onClick={() => openEditForm(a)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -499,5 +526,3 @@ export default function AdminArbitresPage() {
     </div>
   );
 }
-
-
