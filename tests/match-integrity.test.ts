@@ -25,6 +25,9 @@ import SuspensionServiceEntry from '../lib/models/SuspensionServiceEntry';
 import Notification from '../lib/models/Notification';
 import AuditLog from '../lib/models/AuditLog';
 import MatchProjectionTask from '../lib/models/MatchProjectionTask';
+import MatchEvent from '../lib/models/MatchEvent';
+import MatchWorkspaceService from '../lib/services/match-workspace.service';
+import Round from '../lib/models/Round';
 
 let replSet: MongoMemoryReplSet;
 let organizationId: mongoose.Types.ObjectId;
@@ -136,10 +139,45 @@ async function createDraftMatch(events: any[] = []) {
   });
 }
 
+/** Like createDraftMatch, but linked to a Round — exercises the multi-task
+ * projection enqueue path (STANDINGS_REBUILD + ROUND_COMPLETION together). */
+async function createDraftMatchWithRound(events: any[] = []) {
+  const round = await Round.create({
+    organizationId,
+    competitionId,
+    saisonId,
+    number: 1,
+    name: 'Journée 1',
+    dateDebut: new Date('2026-02-01T00:00:00Z'),
+    dateFin: new Date('2026-02-02T00:00:00Z'),
+    status: 'ACTIVE',
+  });
+  return Match.create({
+    organizationId,
+    saisonId,
+    competitionId,
+    roundId: round._id,
+    journee: 1,
+    homeClubId,
+    awayClubId,
+    date: new Date('2026-02-01T15:00:00Z'),
+    stade: 'Stade test',
+    scoreHome: 0,
+    scoreAway: 0,
+    statut: 'Brouillon',
+    isOfficial: true,
+    homologue: false,
+    processingVersion: 0,
+    evenements: events,
+  });
+}
+
 beforeAll(async () => {
   replSet = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
   await mongoose.connect(replSet.getUri());
   await Promise.all([
+    MatchEvent.init(),
+    DisciplinaryCard.init(),
     SuspensionServiceEntry.init(),
     MatchProjectionTask.init(),
     Notification.init(),
@@ -270,6 +308,19 @@ describe('Match finalization integrity', () => {
     expect(result).toMatchObject({ status: 'error', error: 'Match introuvable' });
     expect((await Match.findById(match._id).lean())!.homologue).toBe(false);
   });
+
+  it('enqueues both durable projection tasks (standings + round completion) for a round-linked match', async () => {
+    // Regression test: Model.create(array, { session }) throws in Mongoose 8
+    // unless `ordered` is explicit when the array has more than one document.
+    // Round-linked matches enqueue two tasks (STANDINGS_REBUILD + ROUND_COMPLETION)
+    // in the same call, which only round-linked fixtures exercise.
+    const match = await createDraftMatchWithRound();
+    const result = await MatchFinalizationService.finalizeMatch(match._id, actorId.toString(), organizationId);
+    expect(result.status).toBe('finalized');
+    const tasks = await MatchProjectionTask.find({ matchId: match._id }).lean();
+    expect(tasks.map((t) => t.type).sort()).toEqual(['ROUND_COMPLETION', 'STANDINGS_REBUILD']);
+    expect(tasks.every((t) => t.status === 'COMPLETED')).toBe(true);
+  });
 });
 
 describe('Suspension ledger integrity', () => {
@@ -387,5 +438,79 @@ describe('Match correction safety', () => {
       processingVersion: 2,
       status: 'COMPLETED',
     })).toBe(1);
+  });
+});
+
+describe('Canonical match workspace events', () => {
+  it('creates an idempotent event only for a player belonging to a participating club', async () => {
+    const match = await createDraftMatch();
+    const input = { clubId: homeClubId.toString(), playerId: playerId.toString(), type: 'GOAL' as const, minute: 12, clientMutationId: 'mutation-goal-0001', confirmSuspendedPlayer: false };
+    const first = await MatchWorkspaceService.createEvent(match._id.toString(), organizationId.toString(), actorId.toString(), input);
+    const retry = await MatchWorkspaceService.createEvent(match._id.toString(), organizationId.toString(), actorId.toString(), input);
+    expect(first._id.toString()).toBe(retry._id.toString());
+    expect(await MatchEvent.countDocuments({ matchId: match._id })).toBe(1);
+  });
+
+  it('rejects a player/club mismatch server-side', async () => {
+    const match = await createDraftMatch();
+    await expect(MatchWorkspaceService.createEvent(match._id.toString(), organizationId.toString(), actorId.toString(), { clubId: awayClubId.toString(), playerId: playerId.toString(), type: 'YELLOW', minute: 20, clientMutationId: 'mutation-card-0001', confirmSuspendedPlayer: false })).rejects.toThrow('PLAYER_NOT_IN_CLUB');
+  });
+
+  it('credits an own goal to the opponent', async () => {
+    const match = await createDraftMatch();
+    await MatchWorkspaceService.createEvent(match._id.toString(), organizationId.toString(), actorId.toString(), { clubId: homeClubId.toString(), playerId: playerId.toString(), type: 'OWN_GOAL', minute: 31, clientMutationId: 'mutation-own-goal', confirmSuspendedPlayer: false });
+    const workspace = await MatchWorkspaceService.getMatch(match._id.toString(), organizationId.toString());
+    expect(workspace.scoreFromEvents).toEqual({ home: 0, away: 1 });
+  });
+
+  it('blocks score mismatch and rolls back canonical event confirmation', async () => {
+    const match = await createDraftMatch();
+    await MatchWorkspaceService.createEvent(match._id.toString(), organizationId.toString(), actorId.toString(), { clubId: homeClubId.toString(), playerId: playerId.toString(), type: 'GOAL', minute: 41, clientMutationId: 'mutation-mismatch', confirmSuspendedPlayer: false });
+    await expect(MatchFinalizationService.finalizeMatch(match._id, actorId.toString(), organizationId)).rejects.toThrow('Le score saisi ne correspond pas');
+    expect((await Match.findById(match._id).lean())!.homologue).toBe(false);
+    expect((await MatchEvent.findOne({ matchId: match._id }).lean())!.status).toBe('DRAFT');
+  });
+
+  it('finalizes canonical cards with a stable source link and no duplicate', async () => {
+    const match = await createDraftMatch();
+    const event = await MatchWorkspaceService.createEvent(match._id.toString(), organizationId.toString(), actorId.toString(), { clubId: homeClubId.toString(), playerId: playerId.toString(), type: 'YELLOW', minute: 51, clientMutationId: 'mutation-canonical-card', confirmSuspendedPlayer: false });
+    await MatchFinalizationService.finalizeMatch(match._id, actorId.toString(), organizationId);
+    await MatchFinalizationService.finalizeMatch(match._id, actorId.toString(), organizationId);
+    expect((await MatchEvent.findById(event._id).lean())!.status).toBe('CONFIRMED');
+    expect(await DisciplinaryCard.countDocuments({ sourceEventId: event._id })).toBe(1);
+  });
+
+  it('reopens canonical discipline effects without deleting their history', async () => {
+    const match = await createDraftMatch();
+    const event = await MatchWorkspaceService.createEvent(match._id.toString(), organizationId.toString(), actorId.toString(), { clubId: homeClubId.toString(), playerId: playerId.toString(), type: 'YELLOW', minute: 61, clientMutationId: 'mutation-reopen-card', confirmSuspendedPlayer: false });
+    await MatchFinalizationService.finalizeMatch(match._id, actorId.toString(), organizationId);
+    await MatchCorrectionService.reopenMatch(match._id, 'Correction du carton canonique', actorId.toString(), organizationId);
+    expect((await MatchEvent.findById(event._id).lean())!.status).toBe('DRAFT');
+    // sourceEventId is unset on cancellation (freeing it for a future re-finalize
+    // of the same event); the historical link is preserved as previousSourceEventId.
+    const cancelledCard = await DisciplinaryCard.findOne({ previousSourceEventId: event._id }).lean();
+    expect(cancelledCard!.accumulationStatus).toBe('CANCELLED');
+    expect(cancelledCard!.sourceEventId).toBeUndefined();
+    expect((await Match.findById(match._id).lean())!.homologue).toBe(false);
+  });
+
+  it('re-finalizes the same canonical event after a reopen without a sourceEventId collision', async () => {
+    // Regression test: a reopen used to leave sourceEventId set on the
+    // cancelled card, so re-finalizing the same event hit E11000 on the
+    // unique sourceEventId index instead of creating a fresh card.
+    const match = await createDraftMatch();
+    const event = await MatchWorkspaceService.createEvent(match._id.toString(), organizationId.toString(), actorId.toString(), { clubId: homeClubId.toString(), playerId: playerId.toString(), type: 'YELLOW', minute: 61, clientMutationId: 'mutation-refinalize-card', confirmSuspendedPlayer: false });
+    await MatchFinalizationService.finalizeMatch(match._id, actorId.toString(), organizationId);
+    await MatchCorrectionService.reopenMatch(match._id, 'Correction avant re-homologation', actorId.toString(), organizationId);
+
+    const result = await MatchFinalizationService.finalizeMatch(match._id, actorId.toString(), organizationId);
+    expect(result.status).toBe('finalized');
+    expect((await Match.findById(match._id).lean())!.homologue).toBe(true);
+
+    const cards = await DisciplinaryCard.find({ matchId: match._id }).lean();
+    expect(cards).toHaveLength(2);
+    expect(cards.filter((c) => c.accumulationStatus === 'CANCELLED')).toHaveLength(1);
+    const fresh = cards.find((c) => c.accumulationStatus !== 'CANCELLED')!;
+    expect(fresh.sourceEventId?.toString()).toBe(event._id.toString());
   });
 });
