@@ -62,6 +62,13 @@ export function getTemplate(entity: ImportEntity): string {
   return t.headers.join(',') + '\n' + t.example;
 }
 
+export const REQUIRED_HEADERS: Record<ImportEntity, string[]> = {
+  clubs: ['nom', 'code', 'emailOfficiel'],
+  players: ['nom', 'prenom', 'licence', 'clubCode', 'dateNaissance'],
+  fixtures: ['competitionCode', 'journee', 'date', 'homeClubCode', 'awayClubCode'],
+  results: ['competitionCode', 'journee', 'homeClubCode', 'awayClubCode', 'scoreHome', 'scoreAway'],
+};
+
 export function validateCsv(
   csvContent: string,
   entity: ImportEntity
@@ -88,6 +95,7 @@ export function validateCsv(
     return { rows: [row], headers: allHeaders };
   }
 
+  const required = REQUIRED_HEADERS[entity];
   const rows: ImportRow[] = result.data.map((raw, i) => {
     const row: ImportRow = {
       rowNumber: i + 2,
@@ -97,7 +105,7 @@ export function validateCsv(
       valid: true,
     };
 
-    for (const h of template.headers) {
+    for (const h of required) {
       if (!raw[h] || !raw[h].trim()) {
         row.errors.push(`"${h}" est requis`);
         row.valid = false;
@@ -111,6 +119,218 @@ export function validateCsv(
 }
 
 export class ImportService {
+  static async validateAsync(
+    entity: ImportEntity,
+    rows: ImportRow[],
+    orgId: string | mongoose.Types.ObjectId
+  ): Promise<ImportRow[]> {
+    await connectDB();
+    const orgObjectId = typeof orgId === 'string' ? new mongoose.Types.ObjectId(orgId) : orgId;
+
+    const validatedRows: ImportRow[] = [];
+
+    for (const row of rows) {
+      const validatedRow: ImportRow = {
+        ...row,
+        errors: [...row.errors],
+        warnings: [...row.warnings],
+      };
+
+      try {
+        switch (entity) {
+          case 'clubs': {
+            const email = validatedRow.raw.emailOfficiel?.trim();
+            if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+              validatedRow.errors.push(`Email "${email}" invalide`);
+              validatedRow.valid = false;
+            }
+
+            const fondation = parseInt(validatedRow.raw.fondation);
+            if (isNaN(fondation) || fondation < 1800 || fondation > new Date().getFullYear() + 1) {
+              validatedRow.errors.push(`Année de fondation "${validatedRow.raw.fondation}" invalide`);
+              validatedRow.valid = false;
+            }
+            break;
+          }
+          case 'players': {
+            const clubCode = validatedRow.raw.clubCode?.trim();
+            const club = await Club.findOne({ code: clubCode, organizationId: orgObjectId });
+            if (!club) {
+              validatedRow.errors.push(`Club "${clubCode}" introuvable`);
+              validatedRow.valid = false;
+            }
+
+            const validPositions = ['Gardien', 'Défenseur', 'Milieu', 'Attaquant'];
+            if (validatedRow.raw.position && !validPositions.includes(validatedRow.raw.position.trim())) {
+              validatedRow.errors.push(`Position "${validatedRow.raw.position}" invalide`);
+              validatedRow.valid = false;
+            }
+
+            const dobStr = validatedRow.raw.dateNaissance?.trim();
+            const dob = new Date(dobStr);
+            if (isNaN(dob.getTime())) {
+              validatedRow.errors.push(`Date de naissance "${dobStr}" invalide`);
+              validatedRow.valid = false;
+            }
+
+            const licence = validatedRow.raw.licence?.trim();
+            const existingPlayer = await Joueur.findOne({ licence, organizationId: orgObjectId });
+            if (existingPlayer) {
+              validatedRow.warnings.push(`Le joueur avec la licence "${licence}" existe déjà et sera mis à jour.`);
+            }
+            break;
+          }
+          case 'fixtures': {
+            const compCode = validatedRow.raw.competitionCode?.trim();
+            const comp = await Competition.findOne({ code: compCode, organizationId: orgObjectId });
+            if (!comp) {
+              validatedRow.errors.push(`Compétition "${compCode}" introuvable`);
+              validatedRow.valid = false;
+            }
+
+            const homeClubCode = validatedRow.raw.homeClubCode?.trim();
+            const homeClub = await Club.findOne({ code: homeClubCode, organizationId: orgObjectId });
+            if (!homeClub) {
+              validatedRow.errors.push(`Club domicile "${homeClubCode}" introuvable`);
+              validatedRow.valid = false;
+            }
+
+            const awayClubCode = validatedRow.raw.awayClubCode?.trim();
+            const awayClub = await Club.findOne({ code: awayClubCode, organizationId: orgObjectId });
+            if (!awayClub) {
+              validatedRow.errors.push(`Club extérieur "${awayClubCode}" introuvable`);
+              validatedRow.valid = false;
+            }
+
+            if (homeClubCode === awayClubCode) {
+              validatedRow.errors.push(`Un club ne peut pas jouer contre lui-même`);
+              validatedRow.valid = false;
+            }
+
+            const dateStr = validatedRow.raw.date?.trim();
+            const heureStr = validatedRow.raw.heure?.trim() || '18:00';
+            const date = new Date(`${dateStr}T${heureStr}:00.000Z`);
+            if (isNaN(date.getTime())) {
+              validatedRow.errors.push(`Date "${dateStr}" ou heure "${heureStr}" invalide`);
+              validatedRow.valid = false;
+            }
+            break;
+          }
+          case 'results': {
+            const compCode = validatedRow.raw.competitionCode?.trim();
+            const comp = await Competition.findOne({ code: compCode, organizationId: orgObjectId });
+            if (!comp) {
+              validatedRow.errors.push(`Compétition "${compCode}" introuvable`);
+              validatedRow.valid = false;
+            }
+
+            const homeClubCode = validatedRow.raw.homeClubCode?.trim();
+            const homeClub = await Club.findOne({ code: homeClubCode, organizationId: orgObjectId });
+            if (!homeClub) {
+              validatedRow.errors.push(`Club domicile "${homeClubCode}" introuvable`);
+              validatedRow.valid = false;
+            }
+
+            const awayClubCode = validatedRow.raw.awayClubCode?.trim();
+            const awayClub = await Club.findOne({ code: awayClubCode, organizationId: orgObjectId });
+            if (!awayClub) {
+              validatedRow.errors.push(`Club extérieur "${awayClubCode}" introuvable`);
+              validatedRow.valid = false;
+            }
+
+            if (comp && homeClub && awayClub) {
+              const journee = parseInt(validatedRow.raw.journee) || 1;
+              const match = await Match.findOne({
+                competitionId: comp._id,
+                journee,
+                homeClubId: homeClub._id,
+                awayClubId: awayClub._id,
+              });
+              if (!match) {
+                validatedRow.errors.push(`Match ${homeClub.nom} vs ${awayClub.nom} (J${journee}) introuvable dans le calendrier`);
+                validatedRow.valid = false;
+              } else if (match.homologue) {
+                validatedRow.errors.push(`Match ${homeClub.nom} vs ${awayClub.nom} (J${journee}) est déjà homologué`);
+                validatedRow.valid = false;
+              }
+            }
+
+            const scoreHome = parseInt(validatedRow.raw.scoreHome);
+            const scoreAway = parseInt(validatedRow.raw.scoreAway);
+            if (isNaN(scoreHome) || scoreHome < 0) {
+              validatedRow.errors.push(`Score domicile "${validatedRow.raw.scoreHome}" invalide`);
+              validatedRow.valid = false;
+            }
+            if (isNaN(scoreAway) || scoreAway < 0) {
+              validatedRow.errors.push(`Score extérieur "${validatedRow.raw.scoreAway}" invalide`);
+              validatedRow.valid = false;
+            }
+
+            const validStatuses = ['Terminé', 'Brouillon', 'Reporté', 'Annulé', 'Abandonné', 'Forfait'];
+            if (validatedRow.raw.statut && !validStatuses.includes(validatedRow.raw.statut.trim())) {
+              validatedRow.errors.push(`Statut "${validatedRow.raw.statut}" invalide`);
+              validatedRow.valid = false;
+            }
+
+            if (homeClub && awayClub) {
+              const checkGoalscorers = async (field: 'homeGoalscorers' | 'awayGoalscorers', clubId: mongoose.Types.ObjectId, clubName: string) => {
+                const scorersStr = validatedRow.raw[field]?.trim();
+                if (!scorersStr) return;
+
+                const parts = scorersStr.split(',');
+                for (const part of parts) {
+                  const entry = part.trim();
+                  if (!entry) continue;
+
+                  const matchGoal = entry.match(/^(.+?)\((\d+)\)$/);
+                  if (!matchGoal) {
+                    validatedRow.errors.push(`Buteur "${entry}" mal formaté dans ${field}`);
+                    validatedRow.valid = false;
+                    continue;
+                  }
+
+                  const scorerName = matchGoal[1].trim();
+                  const minute = parseInt(matchGoal[2]);
+                  if (isNaN(minute) || minute < 0 || minute > 130) {
+                    validatedRow.errors.push(`Minute "${matchGoal[2]}" invalide pour le buteur "${scorerName}"`);
+                    validatedRow.valid = false;
+                  }
+
+                  const player = await Joueur.findOne({
+                    clubId,
+                    organizationId: orgObjectId,
+                    $or: [
+                      { licence: scorerName },
+                      { nom: scorerName },
+                      { prenom: scorerName },
+                      { $expr: { $eq: [{ $concat: ['$prenom', ' ', '$nom'] }, scorerName] } },
+                      { $expr: { $eq: [{ $concat: ['$nom', ' ', '$prenom'] }, scorerName] } }
+                    ]
+                  });
+
+                  if (!player) {
+                    validatedRow.warnings.push(`Buteur "${scorerName}" introuvable dans l'effectif de ${clubName}.`);
+                  }
+                }
+              };
+
+              await checkGoalscorers('homeGoalscorers', homeClub._id, homeClub.nom);
+              await checkGoalscorers('awayGoalscorers', awayClub._id, awayClub.nom);
+            }
+            break;
+          }
+        }
+      } catch (err: any) {
+        validatedRow.errors.push(`Erreur de validation: ${err.message}`);
+        validatedRow.valid = false;
+      }
+
+      validatedRows.push(validatedRow);
+    }
+
+    return validatedRows;
+  }
+
   static async process(
     entity: ImportEntity,
     rows: ImportRow[],
@@ -290,23 +510,45 @@ export class ImportService {
 
     const evenements: any[] = [];
 
-    if (row.raw.homeGoalscorers) {
-      row.raw.homeGoalscorers.split(',').forEach((entry: string) => {
-        const match2 = entry.trim().match(/^(.+?)\((\d+)\)$/);
-        if (match2) {
-          evenements.push({ type: 'But' as const, minute: parseInt(match2[2]), equipe: 'home' as const, description: match2[1] });
-        }
-      });
-    }
+    const parseScorers = async (field: 'homeGoalscorers' | 'awayGoalscorers', clubId: mongoose.Types.ObjectId, equipe: 'home' | 'away') => {
+      const scorersStr = row.raw[field];
+      if (!scorersStr) return;
 
-    if (row.raw.awayGoalscorers) {
-      row.raw.awayGoalscorers.split(',').forEach((entry: string) => {
-        const match2 = entry.trim().match(/^(.+?)\((\d+)\)$/);
-        if (match2) {
-          evenements.push({ type: 'But' as const, minute: parseInt(match2[2]), equipe: 'away' as const, description: match2[1] });
+      const parts = scorersStr.split(',');
+      for (const part of parts) {
+        const entry = part.trim();
+        if (!entry) continue;
+
+        const matchGoal = entry.match(/^(.+?)\((\d+)\)$/);
+        if (matchGoal) {
+          const scorerName = matchGoal[1].trim();
+          const minute = parseInt(matchGoal[2]);
+
+          const player = await Joueur.findOne({
+            clubId,
+            organizationId: orgId,
+            $or: [
+              { licence: scorerName },
+              { nom: scorerName },
+              { prenom: scorerName },
+              { $expr: { $eq: [{ $concat: ['$prenom', ' ', '$nom'] }, scorerName] } },
+              { $expr: { $eq: [{ $concat: ['$nom', ' ', '$prenom'] }, scorerName] } }
+            ]
+          });
+
+          evenements.push({
+            type: 'But' as const,
+            minute,
+            equipe,
+            joueurId: player ? player._id : undefined,
+            description: player ? `${player.prenom} ${player.nom}` : scorerName
+          });
         }
-      });
-    }
+      }
+    };
+
+    await parseScorers('homeGoalscorers', homeClub._id, 'home');
+    await parseScorers('awayGoalscorers', awayClub._id, 'away');
 
     await Match.updateOne(
       { _id: match._id },

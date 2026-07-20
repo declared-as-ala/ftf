@@ -16,7 +16,11 @@ export async function GET(req: Request) {
     const unreadOnly = url.searchParams.get('unread') === 'true';
     const type = url.searchParams.get('type');
 
-    const filter: Record<string, unknown> = { organizationId: orgId };
+    // Admin-only notifications: no recipientClubId (system events)
+    const filter: Record<string, unknown> = {
+      organizationId: orgId,
+      recipientClubId: { $exists: false },
+    };
     if (unreadOnly) filter.read = false;
     if (type) filter.type = type;
 
@@ -27,7 +31,7 @@ export async function GET(req: Request) {
         .limit(limit)
         .lean(),
       Notification.countDocuments(filter),
-      unreadOnly ? 0 : Notification.countDocuments({ organizationId: orgId, read: false, recipientClubId: { $exists: false } }),
+      unreadOnly ? 0 : Notification.countDocuments({ organizationId: orgId, recipientClubId: { $exists: false }, read: false }),
     ]);
 
     return NextResponse.json({

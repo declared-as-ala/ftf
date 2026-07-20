@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { matchCreateSchema, matchResultPatchSchema } from '../lib/validators/match';
 import { eventCreateSchema, eventUpdateSchema } from '../lib/validators/event';
 import { objectIdSchema } from '../lib/validators/common';
+import {
+  matchEventCancelSchema,
+  matchEventCreateSchema,
+} from '../lib/validators/match-event';
 
 const oid = () => '6540deadbeef1234567890ab';
 const oid2 = () => '6540deadbeef1234567890ac';
@@ -98,5 +102,30 @@ describe('eventUpdateSchema', () => {
   });
   it('exige un eventId valide', () => {
     expect(eventUpdateSchema.safeParse({ eventId: 'nope' }).success).toBe(false);
+  });
+});
+
+describe('canonical match event schemas', () => {
+  const validEvent = () => ({
+    clubId: oid(),
+    playerId: oid2(),
+    type: 'GOAL',
+    minute: 90,
+    stoppageMinute: 4,
+    clientMutationId: 'match-editor-001',
+  });
+
+  it('accepts a canonical goal with stoppage time', () => {
+    expect(matchEventCreateSchema.parse(validEvent()).stoppageMinute).toBe(4);
+  });
+
+  it('rejects an assist on a card and a self-assist', () => {
+    expect(matchEventCreateSchema.safeParse({ ...validEvent(), type: 'YELLOW', assistPlayerId: oid() }).success).toBe(false);
+    expect(matchEventCreateSchema.safeParse({ ...validEvent(), assistPlayerId: oid2() }).success).toBe(false);
+  });
+
+  it('requires a meaningful soft-cancellation reason', () => {
+    expect(matchEventCancelSchema.safeParse({ reason: 'no' }).success).toBe(false);
+    expect(matchEventCancelSchema.safeParse({ reason: 'Correction du rapport officiel' }).success).toBe(true);
   });
 });

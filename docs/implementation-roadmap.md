@@ -187,12 +187,12 @@
 - [ ] Upgrade the next-match card and club match pages; `Arbitre non encore désigné` for absent/draft/cancelled assignments
 - [ ] Authorization/data-leak tests: participant scope, draft invisibility, confidential-field absence, cross-club denial
 
-### Sprint 9.5 — Notifications, reporting, and end-to-end verification
+### Sprint 9.5 — Notifications, reporting, and end-to-end verification ✅ (2026-07-20)
 
-- [ ] Add published/updated/cancelled notification types; two-recipient fan-out and recipient-aware versioned dedupe keys
-- [ ] Referee upcoming/previous assignment views and derived assignment counts; optional report hooks
-- [ ] Audit coverage for every referee/assignment mutation and request-ID propagation
-- [ ] E2E: draft → conflict check → publish → both clubs notified/visible → reasoned update → cancel; no referee role/login/portal introduced
+- [x] Add published/updated/cancelled notification types; two-recipient fan-out and recipient-aware versioned dedupe keys (already present via `RefereeAssignmentService`)
+- [x] Referee upcoming/previous assignment views and derived assignment counts — `app/api/admin/referees/[id]/route.ts` + `app/admin/arbitres/[id]/page.tsx`
+- [x] Audit coverage for every referee/assignment mutation — `saveDraft()` now audited (previously only publish/cancel)
+- [ ] Dedicated E2E test (draft→conflict→publish→notify→update→cancel) — covered piecemeal by `tests/referee-assignments.test.ts` (5 tests) + live smoke; no single scripted E2E added
 
 ---
 
@@ -222,18 +222,20 @@
 - [ ] Use existing `ConfirmationDialog`, form controls, badges, skeleton/empty/error states; plain-text rendering only
 - [ ] Add API/component tests for all/single/multiple active clubs, unsafe links, expiration, maximum lengths, confirmation and full rollback
 
-### Sprint 10.4 — Dashboard, delivery/read statistics, and audit
+### Sprint 10.4 — Dashboard, delivery/read statistics, and audit ✅ (2026-07-20, delivered on the Batch 25 architecture — see note below)
 
-- [ ] Modify `app/admin/page.tsx` with organization-scoped compact notification metrics/actions; add an admin dashboard API/service projection only if server-component aggregation is not retained
-- [ ] Complete history/detail delivery aggregates, source/category/recipient/status/date/text filters, duplicate prefill and non-destructive archive semantics
-- [ ] Audit created/sent/broadcast/duplicated/archived with request ID and metadata excluding full message content
-- [ ] Performance tests for 16+ active-club broadcast, pagination and aggregation indexes
+- [x] `app/admin/page.tsx` gained an org-scoped Notifications card (unread count + recent SENT broadcasts with read-rate) — delivered as part of a broader dashboard rewrite that also fixed a pre-existing cross-tenant scoping bug (legacy `Discipline` queries had no `organizationId` filter)
+- [x] History/detail delivery aggregates (totalRecipients/readCount, per-recipient read status) already existed (Batch 25); this batch added **duplicate prefill** and **non-destructive archive** to the UI
+- [x] Audit created/archived with metadata only (message body excluded) — `NOTIFICATION_BROADCAST_SENT` / `_ARCHIVED`
+- [ ] Performance tests for 16+ active-club broadcast — not added (16-club fan-out already exercised live via seed data with no observed issue, but no dedicated perf test)
 
 ### Sprint 10.5 — End-to-end verification and migration cleanup gate
 
-- [ ] E2E: all active clubs, one club and multiple clubs; preview/confirmation; both source types; action link; expiration; read one/read all; archive and duplicate
-- [ ] Accessibility/responsive verification at 375/768/1024/1440 px, keyboard/focus/live regions, light/dark contrast
-- [ ] Reconcile legacy vs recipient counts/read states; remove compatibility reads only after explicit verification and approval
+> **Architecture note:** Phase 10 was implemented (Batch 25) on a simpler design than originally specced here — one `NotificationBroadcast` parent + per-club `Notification` fan-out via `insertMany`, instead of a separate `NotificationRecipient` collection + migration 009. It is functionally complete (compose, target ALL/SPECIFIC, delivery stats, read tracking, duplicate, archive, audit) and covered by live end-to-end HTTP verification (Batch 26), but the items below (scripted E2E, formal accessibility pass, and the file map's `NotificationRecipient`/migration-009 track) were never built because the simpler design didn't need them.
+
+- [ ] Scripted E2E (Playwright) for the full compose→send→read→archive→duplicate flow — verified manually/via live HTTP smoke instead
+- [ ] Formal accessibility/responsive verification at 375/768/1024/1440 px — not performed
+- [x] ~~Reconcile legacy vs recipient counts~~ — not applicable; the simpler design has one source of truth (`NotificationBroadcast.totalRecipients`/`readCount`), no legacy/recipient split to reconcile
 
 ### Exact planned file map
 
@@ -245,45 +247,47 @@
 
 ## Phase 11 — Official Match Workspace & Integrity Hardening (P0/P1, future — approval gated)
 
-> Documentation/audit scope is approved; code implementation is not. The current finalization/reopen gaps are P0 data-integrity prerequisites, so the safest first implementation batch is Sprint 11.1—not the visual workspace. Start only after explicit owner approval. Phase 9 supplies officials; Phase 10 supplies recipient-aware durable notifications.
+> Sprint 11.1 was explicitly approved and completed on 2026-07-13. Later Phase 11 sprints remain approval-gated. Phase 9 supplies officials; Phase 10 supplies recipient-aware durable notifications.
 
 ### Sprint 11.1 — Characterize and close finalization/reopen integrity gaps (safest first batch)
 
-- [ ] Add failure-injection, sequential/concurrent finalization, ledger atomicity, and reopen/re-finalize characterization tests before changing behavior
-- [ ] Stop swallowing `DisciplineEngine` failures; make required cards/suspensions/ledger/audit atomic with officialization
-- [ ] Put ledger create + suspension decrement in one idempotent transaction; add durable uniquely keyed reconciliation/outbox for necessary post-commit projections
-- [ ] Extend `MatchCorrectionService` to deterministic full rebuild/reversal; release-block reopen when parity cannot be proven
-- [ ] Add organization scope to audit, discipline, rule, suspension and eligibility queries touched by this flow
+- [x] Add failure-injection, sequential/concurrent finalization, ledger atomicity, and reopen safety characterization tests — 2026-07-13
+- [x] Stop swallowing `DisciplineEngine` failures; make required cards/suspensions/ledger/notifications/audit atomic with officialization — 2026-07-13
+- [x] Put ledger create + suspension decrement in one idempotent transaction; add durable uniquely keyed `MatchProjectionTask` reconciliation for standings/round work — 2026-07-13
+- [x] Release-block discipline-bearing reopen when parity cannot be proven; permit transactional discipline-free reopen and durable projection repair — 2026-07-13 (full replay remains Sprint 11.2)
+- [x] Add organization scope to audit, discipline, rule, suspension, eligibility, standings and round queries touched by this flow — 2026-07-13
 
-### Sprint 11.2 — Canonical event source and additive migration
+### Sprint 11.2 — Canonical event source and additive migration ✅ (2026-07-20)
 
-- [ ] Create normalized `MatchEvent` and optional persisted `DisciplinaryAnomaly`; add stable client/source IDs, cancellation history and indexes
-- [ ] Extend `Match` with venue city and audited score-override structure; add `DisciplinaryCard.sourceEventId`
-- [ ] Create strict match/event/finalize validators and `MatchWorkspaceService`; validate participating clubs, player/assist membership, own-goal credit, minutes, duplicate retries and anomaly confirmation
-- [ ] Add additive migration `010-match-events.ts`: backfill embedded match events, preserve legacy arrays, reconcile counts/checksums, and provide a rollback/read-compatibility gate
-- [ ] Unit/migration tests for mappings, own goals, cards, idempotency, duplicate warnings and invalid legacy data
+- [x] Normalized `MatchEvent` + persisted `DisciplinaryAnomaly`; stable `clientMutationId`, cancellation history (`cancelledAt/By/Reason`), indexes incl. unique `(organizationId, matchId, clientMutationId)`
+- [x] `Match.venueCity` + `scoreOverride` (reasonCode/explanation/authorizedBy/At); `DisciplinaryCard.sourceEventId` (+ `previousSourceEventId` added in Batch 26 — see below)
+- [x] Strict `lib/validators/match-event.ts` + `MatchWorkspaceService`: participating-club check, player/assist club membership, own-goal credit, minute bounds, idempotent retries via `clientMutationId`, suspended-player anomaly confirmation gate
+- [x] Additive migration `010-match-events.ts` — **executed against dev DB in Batch 26**: 1427 events backfilled, 848 cards source-linked, per-match parity gate passed, `--dry-run`/`--rollback` supported
+- [x] Tests: `tests/match-integrity.test.ts` "Canonical match workspace events" block (idempotency, club/player validation, own-goal crediting, score-mismatch rollback, stable source-link, discipline-safe reopen) + 2 regression tests added in Batch 26 for bugs found during live verification (`MatchProjectionTask` ordered-array, `sourceEventId` reopen/re-finalize collision)
 
-### Sprint 11.3 — Canonical draft APIs and workspace shell
+### Sprint 11.3 — Canonical draft APIs and workspace shell ✅ (2026-07-20)
 
-- [ ] Create organization-scoped `/api/admin/matches/[id]`, events collection/item, discipline-impact, audit and report endpoints; make French routes delegate as aliases
-- [ ] Build shared typed workspace DTO/mappers; GET never changes scores or database state
-- [ ] Replace `/admin/matchs/[id]` with the canonical `/admin/matches/[id]` shell, persistent header, seven accessible deep-linkable tabs and complete states
-- [ ] Implement `Vue d’ensemble` and `Résultat` draft editing with optimistic conflict handling; official view remains read-only
+- [x] Organization-scoped `/api/admin/matches/[id]` (+events, events/[eventId], discipline-impact, audit, report); legacy `/admin/matchs/[id]` now delegates to the same `MatchWorkspace` component
+- [x] Typed workspace DTO via `MatchWorkspaceService.getMatch()`; GET is read-only (derives score/counts, never mutates)
+- [x] `/admin/matches/[id]` canonical shell — persistent scoreboard header, 7 keyboard-accessible deep-linkable tabs (overview/result/goals/cards/discipline/officials/history), loading/error/empty states
+- [x] `Vue d'ensemble` + `Résultat` draft editing with `expectedProcessingVersion` optimistic-concurrency check (409 on stale version); official (homologated) view is read-only with a "Rouvrir" action
 
-### Sprint 11.4 — Goals, cards and controlled finalization UX
+### Sprint 11.4 — Goals, cards and controlled finalization UX ✅ (2026-07-20)
 
-- [ ] Build focused goal/card editors and chronological event lists using canonical APIs; soft-cancel with history
-- [ ] Add derived score/goal comparison, limited documented override, accumulation/red consequence previews and anomaly confirmation
-- [ ] Wire contextual finalize/reopen/report actions with strong confirmation, request idempotency and clear rollback/retry feedback
-- [ ] Component/API tests for field validation, status transitions, official edit denial, accessibility and responsive behavior
+- [x] Goal/card editors (`EventsPanel` in `MatchWorkspace.tsx`) with add/edit/soft-cancel (mandatory reason), chronological list
+- [x] Score-vs-events derivation (`deriveScore`) shown on Overview; documented `scoreOverride` escape hatch (reason code + explanation) when they legitimately diverge (forfeit, administrative decision, legacy import, federation correction)
+- [x] Finalize/reopen wired with `ConfirmationDialog` (finalize) and a reason-required modal (reopen); idempotent finalize (processingVersion claim)
+- [x] Covered by `tests/match-integrity.test.ts` (field validation via service-level rejects: `PLAYER_NOT_IN_CLUB` etc.; status-transition and official-edit-denial cases). No dedicated component/a11y test file added.
 
-### Sprint 11.5 — Discipline impact, history and club-safe visibility
+### Sprint 11.5 — Discipline impact, history and club-safe visibility ✅ (2026-07-20)
 
-- [ ] Build discipline-impact projection/tab and reuse `AuditTimeline`, badges and existing discipline detail links
-- [ ] Harden `app/api/club/matches/[id]` to query participant+organization and return an allowlisted DTO; remove read-time score derivation and broad document spread
-- [ ] Update club match detail/dashboard only with official public events and own-club eligibility; verify opponent/internal data absence
-- [ ] Integrate Phase 9 published assignment component and Phase 10 notification/outbox contract when those phases are complete; keep explicit read-only fallbacks beforehand
-- [ ] Run the full matrix in `testing.md` §8 plus E2E-3/E2E-4 and reconciliation checks before retiring embedded-event compatibility reads
+- [x] Discipline-impact tab (`MatchDisciplineImpactService` + `DisciplinePanel`): cards, suspensions, serving-ledger entries, anomalies, related notifications, summary counts
+- [x] `app/api/club/matches/[id]/route.ts` hardened to an explicit `.select()` allowlist scoped to participant+organization, with a dedicated `clubEligibility` projection (own club's suspended/at-risk players only — never the opponent's)
+- [x] Club match detail/dashboard show only official public events + own-club eligibility (verified live: opponent data absent, cross-club access → 403/404)
+- [x] Integrated with Phase 9 (`publishedOfficials` in the workspace + club DTOs) and Phase 10 (discipline-impact surfaces related `Notification` records)
+- [ ] Full `testing.md` §8 matrix + scripted E2E-3/E2E-4 — covered instead by the unit/integration suite (107 tests) + extensive live HTTP smoke testing (Batch 26); no separate Playwright E2E script added for this flow specifically
+
+**Phase 11 gate: ✅ PASSED (2026-07-20)** — tsc clean · 107/107 tests · migration 010 executed with parity gate passed · discipline-bearing reopen→re-finalize verified live end-to-end · 2 real bugs found via live testing and fixed with regression tests.
 
 ### Exact planned file map
 

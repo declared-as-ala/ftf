@@ -3,6 +3,7 @@ import { requireAdmin, apiError } from '@/lib/api';
 import connectDB from '@/lib/db';
 import Round from '@/lib/models/Round';
 import Match from '@/lib/models/Match';
+import MatchOfficialAssignment from '@/lib/models/MatchOfficialAssignment';
 import '@/lib/models/Club';
 import '@/lib/models/Joueur';
 
@@ -35,7 +36,24 @@ export async function GET(
       .sort({ date: 1 })
       .lean();
 
-    return NextResponse.json({ round, matches });
+    const matchIds = matches.map(m => m._id);
+    const assignments = await MatchOfficialAssignment.find({
+      matchId: { $in: matchIds },
+      organizationId: orgId,
+    })
+      .sort({ version: -1 })
+      .populate('referees.refereeId')
+      .lean();
+
+    const latestAssignments: Record<string, any> = {};
+    for (const ass of assignments) {
+      const mId = ass.matchId.toString();
+      if (!latestAssignments[mId]) {
+        latestAssignments[mId] = ass;
+      }
+    }
+
+    return NextResponse.json({ round, matches, latestAssignments });
   } catch (error) {
     return apiError(error, `GET /api/admin/competitions/${(await params).id}/rounds/${(await params).roundId}`);
   }

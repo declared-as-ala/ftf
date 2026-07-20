@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Calendar } from 'lucide-react';
+import { Calendar, UserRound } from 'lucide-react';
 
 interface MatchItem {
   _id: string;
@@ -17,6 +17,10 @@ interface MatchItem {
   homeClubId: { _id: string; nom: string; logo: string };
   awayClubId: { _id: string; nom: string; logo: string };
   competitionId: { _id: string; nom: string };
+  publishedOfficials?: {
+    publishedAt: string | null;
+    referees: { displayName: string; role: string; categorie?: string }[];
+  } | null;
 }
 
 export default function ClubMatches() {
@@ -74,8 +78,8 @@ export default function ClubMatches() {
             <Link key={m._id} href={`/club/matches/${m._id}`}>
               <Card className="transition-colors hover:bg-accent cursor-pointer">
                 <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex-1">
-                    <p className="font-medium">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">
                       {m.homeClubId?.nom} vs {m.awayClubId?.nom}
                     </p>
                     <p className="text-sm text-muted-foreground">
@@ -83,6 +87,15 @@ export default function ClubMatches() {
                         day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
                       })}
                     </p>
+                    {m.publishedOfficials && (() => {
+                      const main = m.publishedOfficials!.referees.find((r) => r.role === 'MAIN');
+                      return main ? (
+                        <p className="mt-0.5 flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
+                          <UserRound className="h-3 w-3" />
+                          {main.displayName}
+                        </p>
+                      ) : null;
+                    })()}
                   </div>
                   <div className="flex items-center gap-3">
                     {m.statut === 'Terminé' && (
